@@ -172,6 +172,41 @@ class GRU(object):
         self.output = rval
         return self.output
 
+    def get_allsteps_out(self, state_below, mask_below, init_state=None, context=None):
+        #Todo:
+        """output every steps"""
+        if state_below.ndim == 3:
+            batch_size = state_below.shape[1]
+            n_steps = state_below.shape[0]
+        else:
+            raise NotImplementedError
+
+
+        if self.with_contex:
+            if init_state is None:
+                init_state = T.tanh(theano.dot(context, self.W_c_init))
+            c_z = theano.dot(context, self.W_cz)
+            c_r = theano.dot(context, self.W_cr)
+            c_h = theano.dot(context, self.W_ch)
+            non_sequences = [c_z, c_r, c_h]
+            rval, updates = theano.scan(self._step_forward_with_context,
+                                        sequences=[state_below, mask_below],
+                                        outputs_info=[init_state],
+                                        non_sequences=non_sequences,
+                                        n_steps=n_steps
+                                        )
+
+        else:
+            if init_state is None:
+                init_state = T.alloc(numpy.float32(0.), batch_size, self.n_hids)
+            rval, updates = theano.scan(self._step_forward,
+                                        sequences=[state_below, mask_below],
+                                        outputs_info=[init_state],
+                                        n_steps=n_steps
+                                        )
+        self.output = rval
+        return self.output
+
     def merge_out(self, state_below, mask_below, context=None):
         hiddens = self.apply(state_below, mask_below, context=context)
         if context is None:
