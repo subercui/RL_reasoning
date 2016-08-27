@@ -1,8 +1,6 @@
 import theano
 import numpy as np
-"""
-author:liuxianggen
-"""
+
 class Memory(object):
 
 	def __init__(self, entries=None):
