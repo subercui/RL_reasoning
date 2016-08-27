@@ -1,35 +1,41 @@
 import theano
 import numpy as np
-"""
-author:liuxianggen
-"""
-class Memory(object):
 
+class Memory(object):
+	"""
+	author:liuxianggen
+	"""
 	def __init__(self, entries=None):
-		"""entries: list"""
+		"""
+		entries: list of facts
+
+		"""
 		self.entries = []
 		assert isinstance(entries, list)
 		if entries != None:
 			self.entries = entries
 
-	def append(entry):
+	def append(self, entry):
 		self.entries.append(entry)
 
-	def read(index):
+	def read(self, index):
 		return self.entries[index]
 
 
 class LocationNet(object):
-
+	"""
+	author: Suber
+	"""
 	def __init__(self, **kwargs):
 		self.n_in = kwargs.pop('n_in')
 		self.n_hids = kwargs.pop('n_hids')
 		self.n_layer = kwargs.pop('n_layer')
 
-	def prepare_inputs():
+	def prepare_inputs(self):
+		pass
 
 	def apply(self, ques, ques_mask, ht, mem, mem_mask):
-		gru_in, gru_in_mask = prepare_inputs(ques, ques_mask, ht, Mem, mem_mask)
+		gru_in, gru_in_mask = prepare_inputs(ques, ques_mask, ht, mem, mem_mask)
 		#gru_in should be (n_steps, bat_sizes, embedding)
 		assert gru_in.ndim == 3
 		assert gru_in_mask.ndim == 3
