@@ -6,7 +6,7 @@ def get_config():
 	config['vocab_size'] = 21
 	config['label_size'] = 2 #whats this
 	
-	datadir ='./data/'
+	datadir ='../data/'
 	
 	### raw training data and test data ###
 	raw_train_file = datadir + 'qa19_path-finding_train.txt'

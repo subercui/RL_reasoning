@@ -1,4 +1,7 @@
+import sys
+sys.path.insert(0, "../")
 import config
+
 
 def pre_procsee(f_name, q_name, l_name, r_name):
 
