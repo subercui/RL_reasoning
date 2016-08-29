@@ -1,31 +1,32 @@
 import theano
 import numpy as np
 
+from component import *
 class Memory(object):
-
     """
     author:liuxianggen
     """
+
     def __init__(self, **kwargs):
         self.vocab_size = kwargs.pop('vocab_size')
         self.n_in = kwargs.pop('nemb')
         self.n_hids = kwargs.pop('nhids')
         self.n_layer = kwargs.pop('n_layer')
         self.n_label = kwargs.pop('label_size')
-        self.params=[]
+        self.params = []
+        self.cost = 0
 
     def apply(self, facts, facts_mask, question, question_mask, y):
-
         table = lookup_table(self.n_in, self.vocab_size)
         self.params += table.params
-
         facts_encoder = auto_encoder(facts, facts_mask, self.vocab_size,
                                      self.n_in, self.n_hids, table=table)
-        self.eval = facts_encoder.output
+        self.params += facts_encoder.params
+        self.eval = facts_encoder.output  # (10,5,39)
+        self.cost = facts_encoder.cost
         return self.eval
 
-
-	# def append(self, entry):
+    # def append(self, entry):
 	# 	self.entries.append(entry)
     #
 	# def read(self, index):

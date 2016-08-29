@@ -1,13 +1,10 @@
 def get_config():
-
-
 	config = {}
 	config['nhids'] = 39 #hidden units
 	config['nemb'] = 30 #
 	config['n_layer'] = 3
-	#the following two is set by the data, when run the stream.py
 	config['vocab_size'] = 24
-	config['label_size'] = 12 
+	config['label_size'] = 12 #whats this
 	
 	datadir ='/home/lxg/workspace-python/RL_reasoning/data/'
 	
