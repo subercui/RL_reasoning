@@ -5,7 +5,7 @@ Authors:Haotian Cui, Yukun Yan, Xianggen Liu
 * preprocess.py: replace the end char "." and add "|||"
 * stream.py: 
 1.add "<s></s>" to the phrase
-2.build the process class, then map to the index, make up the vector representation
+2.build the process class, then map to the index, make up the vector representation<br>
 finally,return a list of vectors.
 namely, 
 for facts, question, label in data_class.data_stream():#facts,question:length->2,label -> 1,such as:

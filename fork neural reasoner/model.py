@@ -210,7 +210,6 @@ class lookup_table(object):
 
         return self.W[indices.flatten()].reshape(outshape)
 
-
 class auto_encoder(object):
     def __init__(self, sentence, sentence_mask, vocab_size, n_in, n_hids, **kwargs):
         layers = []

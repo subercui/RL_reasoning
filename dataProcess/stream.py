@@ -1,15 +1,16 @@
 import sys
+sys.path.insert(0, "../")
 import logging
 logging.basicConfig(level=logging.INFO)
 import cPickle as pickle
 logger = logging.getLogger(__name__)
 import numpy
 import os
-import configurations
+import config
 
 
 
-config = getattr(configurations, 'get_config')()
+config = getattr(config, 'get_config')()
 
 def creat_dic_with_lines(lines):
     wordset = set(item for line in lines for item in line.strip().split())
