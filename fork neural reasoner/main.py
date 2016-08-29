@@ -5,7 +5,7 @@ import theano.tensor as T
 from reasoning import Reason
 import logging
 from utils import adadelta
-import configurations
+import config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

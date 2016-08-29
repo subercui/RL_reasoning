@@ -1,4 +1,5 @@
 import sys
+sys.path.insert(0, "../")
 import logging
 logging.basicConfig(level=logging.INFO)
 import cPickle as pickle

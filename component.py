@@ -200,7 +200,7 @@ class GRU(object):
 class lookup_table(object):
     def __init__(self, embsize, vocab_size):
         self.W = param_init().uniform((vocab_size, embsize))
-        self.params \= [self.W]
+        self.params = [self.W]
         self.vocab_size = vocab_size
         self.embsize = embsize
 
