@@ -30,9 +30,10 @@ class Memory(object):
 
     def read(self, index):
         if(index<len(self.cost_entry)):
-            return self.eval[:,index,:],self.cost_entry[index]
+            return self.output[:,index,:],self.cost_entry[index]
         else:
             None,None
+
 
 
 class Question(object):
@@ -56,11 +57,11 @@ class Question(object):
         self.params += facts_encoder.params
         self.output = facts_encoder.output  # (13,39)
         self.cost = facts_encoder.cost
-        return self.eval
+        return self.output # (13,39)
 
 
 # take neural reasoner for example
-class Reasoner(object):
+class Reasoner_lxg(object):
 
     def __init__(self, **kwargs):
         self.vocab_size = kwargs.pop('vocab_size')
@@ -122,10 +123,10 @@ class Reasoner(object):
                                           )
         return inter_reps
 
-class LocationNet(object):
+class LocationNet_lxg(object):
 
-	def __init__(self,num_fact, **kwargs):
-		self.num_fact = num_fact
+	def __init__(self, context, **kwargs):
+		self.num_fact =
 
 	# def prepare_inputs():
 
