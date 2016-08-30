@@ -2,17 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="e3a767ad-85aa-46bc-b2db-6ed5546af3da" name="Default" comment="">
-      <change type="DELETED" beforePath="$PROJECT_DIR$/data/pathfinding_19.answer" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/data/pathfinding_19.fact" afterPath="" />
-      <change type="DELETED" beforePath="$PROJECT_DIR$/data/pathfinding_19ques" afterPath="" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.ipynb_checkpoints/mainClass-checkpoint.ipynb" afterPath="$PROJECT_DIR$/.ipynb_checkpoints/mainClass-checkpoint.ipynb" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/component.py" afterPath="$PROJECT_DIR$/component.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/config.py" afterPath="$PROJECT_DIR$/config.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/experiment.py" afterPath="$PROJECT_DIR$/experiment.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/fork neural reasoner/main.py" afterPath="$PROJECT_DIR$/fork neural reasoner/main.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/mainClass.ipynb" afterPath="$PROJECT_DIR$/mainClass.ipynb" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/model.py" afterPath="$PROJECT_DIR$/model.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/utils.py" afterPath="$PROJECT_DIR$/utils.py" />
     </list>
     <ignored path="RL_reasoning.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -117,8 +108,8 @@
     </option>
   </component>
   <component name="ProjectFrameBounds">
-    <option name="x" value="564" />
-    <option name="y" value="136" />
+    <option name="x" value="910" />
+    <option name="y" value="81" />
     <option name="width" value="1491" />
     <option name="height" value="1024" />
   </component>
@@ -205,6 +196,9 @@
   <component name="ShelveChangesManager" show_recycled="false">
     <option name="remove_strategy" value="false" />
   </component>
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="e3a767ad-85aa-46bc-b2db-6ed5546af3da" name="Default" comment="" />
@@ -216,8 +210,8 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="564" y="136" width="1491" height="1024" extended-state="0" />
-    <editor active="true" />
+    <frame x="910" y="81" width="1491" height="1024" extended-state="0" />
+    <editor active="false" />
     <layout>
       <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="0" side_tool="false" content_ui="combo" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
@@ -237,6 +231,14 @@
       <window_info id="Ant Build" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.25" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Debug" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" show_stripe_button="true" weight="0.4" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
     </layout>
+  </component>
+  <component name="Vcs.Log.UiProperties">
+    <option name="RECENTLY_FILTERED_USER_GROUPS">
+      <collection />
+    </option>
+    <option name="RECENTLY_FILTERED_BRANCH_GROUPS">
+      <collection />
+    </option>
   </component>
   <component name="VcsContentAnnotationSettings">
     <option name="myLimit" value="2678400000" />
