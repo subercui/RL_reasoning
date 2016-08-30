@@ -31,19 +31,36 @@ class LogisticRegression(object):
         self.params = [self.W, self.b]
 
     def cost(self, targets, mask=None):
-        prediction = self.p_y_given_x
+        prediction = self.p_y_given_x # (9,5,24)
 
         if prediction.ndim == 3:
             # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
             prediction_flat = prediction.reshape(((prediction.shape[0] *
                                                    prediction.shape[1]),
-                                                  prediction.shape[2]), ndim=2)
+                                                  prediction.shape[2]), ndim=2) #(45,24)
             targets_flat = targets.flatten()
             mask_flat = mask.flatten()
             ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
         else:
             ce = categorical_crossentropy(prediction, targets)
         return T.sum(ce)
+
+    #liuxianggen
+    def cost_entry(self, targets, mask=None):
+        prediction = self.p_y_given_x # (9,5,24)
+
+        if prediction.ndim == 3:
+            # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
+            prediction_flat = prediction.reshape(((prediction.shape[0] *
+                                                   prediction.shape[1]),
+                                                  prediction.shape[2]), ndim=2) #(45,24)
+            targets_flat = targets.flatten()
+            mask_flat = mask.flatten()
+            ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
+        else:
+            ce = categorical_crossentropy(prediction, targets)
+        ce_entry = ce.reshape((prediction.shape[0],prediction.shape[1]), ndim=2).sum(axis=0)  #(5)
+        return ce_entry
 
     def errors(self, y):
         y_pred = self.y_pred
@@ -208,6 +225,16 @@ class lookup_table(object):
 
 class auto_encoder(object):
     def __init__(self, sentence, sentence_mask, vocab_size, n_in, n_hids, **kwargs):
+        '''
+
+        :param sentence: （10,5）
+        :param sentence_mask:
+        :param vocab_size:
+        :param n_in:
+        :param n_hids:
+        :param kwargs:
+        :return:
+        '''
         layers = []
 
         # batch_size = sentence.shape[1]
@@ -229,11 +256,12 @@ class auto_encoder(object):
 
         decoder_state_below = table.apply(sentence[:-1])
         hiddens = decoder.merge_out(decoder_state_below,
-                                    sentence_mask[:-1], context=context)
+                                    sentence_mask[:-1], context=context) #(9,5,39)
 
         logistic_layer = LogisticRegression(hiddens, n_hids, vocab_size)
         layers.append(logistic_layer)
-
+        self.cost_entry = logistic_layer.cost_entry(sentence[1:], #(9,5)
+                                        sentence_mask[1:]) # predict model cost, (5)
         self.cost = logistic_layer.cost(sentence[1:],
                                         sentence_mask[1:]) / sentence_mask[1:].sum()  # predict model cost
         self.output = momeries
