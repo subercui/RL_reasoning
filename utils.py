@@ -90,6 +90,14 @@ def  repeat_x(x, n_times):
     out = a * b
     return out
 
+def  repeat_x_row(x, n_times):
+    # This is black magic based on broadcasting,
+    # that's why variable names don't make any sense.
+    a = T.shape_padaxis
+    padding = [1] * x.ndim
+    b = T.alloc(numpy.float32(1), n_times, *padding)
+    out = a * b
+    return out
 
 def adadelta(parameters,gradients,rho=0.95,eps=1e-6):
     # create variables to store intermediate updates

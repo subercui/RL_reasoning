@@ -218,7 +218,7 @@ class lookup_table(object):
 
     def apply(self, indices):
         outshape = [indices.shape[i] for i
-                    in range(indices.ndim)] + [self.embsize]
+                    in range(indices.ndim)] + [self.embsize] #[5,10,39]
 
         return self.W[indices.flatten()].reshape(outshape)
 
@@ -247,7 +247,7 @@ class auto_encoder(object):
             table = lookup_table(n_in, vocab_size)
         # layers.append(table)
 
-        state_below = table.apply(sentence)
+        state_below = table.apply(sentence) #（10,5）
         momeries = encoder.apply(state_below, sentence_mask)  # (10,5,39)
         context = momeries[-1]
 

@@ -46,6 +46,23 @@ class LogisticRegression(object):
             ce = categorical_crossentropy(prediction, targets)
         return T.sum(ce)
 
+        # liuxianggen
+    def cost_entry(self, targets, mask=None):
+        prediction = self.p_y_given_x  # (9,5,24)
+
+        if prediction.ndim == 3:
+            # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
+            prediction_flat = prediction.reshape(((prediction.shape[0] *
+                                                   prediction.shape[1]),
+                                                  prediction.shape[2]), ndim=2)  # (45,24)
+            targets_flat = targets.flatten()
+            mask_flat = mask.flatten()
+            ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
+        else:
+            ce = categorical_crossentropy(prediction, targets)
+        ce_entry = ce.reshape((prediction.shape[0], prediction.shape[1]), ndim=2).sum(axis=0)  # (5)
+        return ce_entry
+
     def errors(self, y):
         y_pred = self.y_pred
         if y.ndim == 2:
@@ -68,11 +85,11 @@ class GRU(object):
     def _init_params(self):
         n_in = self.n_in
         n_hids = self.n_hids
-        size_xh = (n_in, n_hids)
-        size_hh = (n_hids, n_hids)
-        self.W_xz = param_init().uniform(size_xh)
-        self.W_xr = param_init().uniform(size_xh)
-        self.W_xh = param_init().uniform(size_xh)
+        size_xh = (n_in, n_hids) #(30,39)
+        size_hh = (n_hids, n_hids) #(39,39)
+        self.W_xz = param_init().uniform(size_xh) #(30,39)
+        self.W_xr = param_init().uniform(size_xh)#(30,39)
+        self.W_xh = param_init().uniform(size_xh)#(30,39)
 
         self.W_hz = param_init().orth(size_hh)
         self.W_hr = param_init().orth(size_hh)
@@ -241,7 +258,7 @@ class lookup_table(object):
 
     def apply(self, indices):
         outshape = [indices.shape[i] for i
-                    in range(indices.ndim)] + [self.embsize]
+                    in range(indices.ndim)] + [self.embsize] #()
 
         return self.W[indices.flatten()].reshape(outshape)
 
@@ -275,16 +292,9 @@ class auto_encoder(object):
 
         self.cost = logistic_layer.cost(sentence[1:],
                                         sentence_mask[1:])/sentence_mask[1:].sum()
+        self.cost_entry = logistic_layer.cost_entry(sentence[1:],  # (9,5)
+                                                    sentence_mask[1:])  # predict model cost, (5)
         self.output = context
         self.params = []
         for layer in layers:
             self.params.extend(layer.params)
-
-
-
-
-
-
-
-
-
