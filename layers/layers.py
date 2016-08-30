@@ -1,8 +1,32 @@
 import theano
 import theano.tensor as T
 import numpy
+import nonlinearities
 from utils import param_init, repeat_x
 from theano.tensor.nnet import categorical_crossentropy
+
+class DenseLayer(object):
+    """
+    author: Cui Haotian
+    """
+
+    def __init__(self, input, n_in, n_out, nonlinearity=nonlinearities.rectify):
+
+        # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
+        self.W = param_init().uniform((n_in, n_out))
+        # initialize the baises b as a vector of n_out 0s
+        self.b = param_init().constant((n_out, ))
+
+        self.nonlinearity = (nonlinearities.identity if nonlinearity is None
+                             else nonlinearity)
+        self.output = self.nonlinearity(T.dot(input, self.W) + self.b)
+        assert energy.ndim ==2
+
+    def get_output_for(self, input):
+        
+        assert input.ndim == 2
+
+        return self.nonlinearity(T.dot(input, self.W) + self.b)
 
 
 class LogisticRegression(object):
@@ -141,11 +165,15 @@ class GRU(object):
 
     def apply(self, state_below, mask_below, init_state=None, context=None):
         if state_below.ndim == 3:
+            #e.g. state_below=(n_step 10, batch_size 5, vector_size 30)
             batch_size = state_below.shape[1]
             n_steps = state_below.shape[0]
         else:
             raise NotImplementedError
 
+
+        if mask_below == None:
+            mask_below = numpy.ones(state_below.shape[:2], dtype='float32')
 
         if self.with_contex:
             if init_state is None:
@@ -172,40 +200,6 @@ class GRU(object):
         self.output = rval
         return self.output
 
-    def get_allsteps_out(self, state_below, mask_below, init_state=None, context=None):
-        #Todo:
-        """output every steps"""
-        if state_below.ndim == 3:
-            batch_size = state_below.shape[1]
-            n_steps = state_below.shape[0]
-        else:
-            raise NotImplementedError
-
-
-        if self.with_contex:
-            if init_state is None:
-                init_state = T.tanh(theano.dot(context, self.W_c_init))
-            c_z = theano.dot(context, self.W_cz)
-            c_r = theano.dot(context, self.W_cr)
-            c_h = theano.dot(context, self.W_ch)
-            non_sequences = [c_z, c_r, c_h]
-            rval, updates = theano.scan(self._step_forward_with_context,
-                                        sequences=[state_below, mask_below],
-                                        outputs_info=[init_state],
-                                        non_sequences=non_sequences,
-                                        n_steps=n_steps
-                                        )
-
-        else:
-            if init_state is None:
-                init_state = T.alloc(numpy.float32(0.), batch_size, self.n_hids)
-            rval, updates = theano.scan(self._step_forward,
-                                        sequences=[state_below, mask_below],
-                                        outputs_info=[init_state],
-                                        n_steps=n_steps
-                                        )
-        self.output = rval
-        return self.output
 
     def merge_out(self, state_below, mask_below, context=None):
         hiddens = self.apply(state_below, mask_below, context=context)
