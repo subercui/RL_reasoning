@@ -40,8 +40,8 @@ class LocationNet(object):
 		output:(mem size,1,qsize+htsize+embedding )
 		"""
 
-        ques = repeat_x(ques, mem.length)
-        ht = repeat_x(ht, mem.length)
+		ques = repeat_x(ques, mem.length)
+		ht = repeat_x(ht, mem.length)
 		output = T.concatenate(ques, ht, mem.output)
 		return output
 
