@@ -5,6 +5,56 @@ from utils import param_init, repeat_x
 from theano.tensor.nnet import categorical_crossentropy
 
 
+class Dense(object):
+    def __init__(self, n_qfvector, n_state):
+        self.n_qfvector = n_qfvector
+        self.n_state = n_state
+
+    def _init_params(self):
+        size_qs = (self.n_qfvector, self.n_state)
+        size_ss = (self.n_state, self.n_state)
+        n_state = self.n_state
+        self.W_qs = param_init().uniform(size=size_qs)
+        self.W_ss = param_init().orth(size=size_ss)
+        self.bias = param_init().constant((n_state, ))
+        self.params = [self.W_qs, self.W_ss, self.bias]
+
+    def apply(self, qfvector, state_tm1):
+        state = T.nnet.sigmoid(T.dot(qfvector, self.W_qs) + T.dot(state_tm1, self.W_ss) + self.bias)
+        self.state = state
+        return self.state
+
+
+class Sigmoid(object):
+    def __init__(self, n_state):
+        self.n_state = n_state
+
+    def _init_params(self):
+        size_sst = (self.n_state, 1)
+        self.W_sst = param_init().uniform(size_sst)
+        self.bias = param_init().constant(1, )
+
+    def apply(self, state):
+        stop = T.nnet.sigmoid(T.dot(state, self.W_sst) + self.bias)
+        return stop
+
+
+class Softmax(object):
+    def __init__(self, n_state, n_answer_class):
+        self.n_state = n_state
+        self.n_answer_class = n_answer_class
+
+    def _init_params(self):
+        size_sa = (self.n_state, self.n_answer_class)
+        self.W_sst = param_init().uniform(size_sa)
+        self.bias = param_init().constant(self.n_answer_class, )
+
+    def apply(self, state):
+        answer = T.nnet.softmax(T.dot(state, self.W_sst) + self.bias)
+        self.answer = answer
+        return self.answer
+
+
 class LogisticRegression(object):
     def __init__(self, input, n_in, n_out):
 
