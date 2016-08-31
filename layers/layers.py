@@ -1,8 +1,32 @@
 import theano
 import theano.tensor as T
 import numpy
+import nonlinearities
 from utils import param_init, repeat_x
 from theano.tensor.nnet import categorical_crossentropy
+
+class DenseLayer(object):
+    """
+    author: Cui Haotian
+    """
+
+    def __init__(self, input, n_in, n_out, nonlinearity=nonlinearities.rectify):
+
+        # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
+        self.W = param_init().uniform((n_in, n_out))
+        # initialize the baises b as a vector of n_out 0s
+        self.b = param_init().constant((n_out, ))
+
+        self.nonlinearity = (nonlinearities.identity if nonlinearity is None
+                             else nonlinearity)
+        self.output = self.nonlinearity(T.dot(input, self.W) + self.b)
+        assert energy.ndim ==2
+
+    def get_output_for(self, input):
+        
+        assert input.ndim == 2
+
+        return self.nonlinearity(T.dot(input, self.W) + self.b)
 
 
 class LogisticRegression(object):
@@ -46,6 +70,23 @@ class LogisticRegression(object):
             ce = categorical_crossentropy(prediction, targets)
         return T.sum(ce)
 
+        # liuxianggen
+    def cost_entry(self, targets, mask=None):
+        prediction = self.p_y_given_x  # (9,5,24)
+
+        if prediction.ndim == 3:
+            # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
+            prediction_flat = prediction.reshape(((prediction.shape[0] *
+                                                   prediction.shape[1]),
+                                                  prediction.shape[2]), ndim=2)  # (45,24)
+            targets_flat = targets.flatten()
+            mask_flat = mask.flatten()
+            ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
+        else:
+            ce = categorical_crossentropy(prediction, targets)
+        ce_entry = ce.reshape((prediction.shape[0], prediction.shape[1]), ndim=2).sum(axis=0)  # (5)
+        return ce_entry
+
     def errors(self, y):
         y_pred = self.y_pred
         if y.ndim == 2:
@@ -68,11 +109,11 @@ class GRU(object):
     def _init_params(self):
         n_in = self.n_in
         n_hids = self.n_hids
-        size_xh = (n_in, n_hids)
-        size_hh = (n_hids, n_hids)
-        self.W_xz = param_init().uniform(size_xh)
-        self.W_xr = param_init().uniform(size_xh)
-        self.W_xh = param_init().uniform(size_xh)
+        size_xh = (n_in, n_hids) #(30,39)
+        size_hh = (n_hids, n_hids) #(39,39)
+        self.W_xz = param_init().uniform(size_xh) #(30,39)
+        self.W_xr = param_init().uniform(size_xh)#(30,39)
+        self.W_xh = param_init().uniform(size_xh)#(30,39)
 
         self.W_hz = param_init().orth(size_hh)
         self.W_hr = param_init().orth(size_hh)
@@ -141,11 +182,15 @@ class GRU(object):
 
     def apply(self, state_below, mask_below, init_state=None, context=None):
         if state_below.ndim == 3:
+            #e.g. state_below=(n_step 10, batch_size 5, vector_size 30)
             batch_size = state_below.shape[1]
             n_steps = state_below.shape[0]
         else:
             raise NotImplementedError
 
+
+        if mask_below == None:
+            mask_below = numpy.ones(state_below.shape[:2], dtype='float32')
 
         if self.with_contex:
             if init_state is None:
@@ -172,40 +217,6 @@ class GRU(object):
         self.output = rval
         return self.output
 
-    def get_allsteps_out(self, state_below, mask_below, init_state=None, context=None):
-        #Todo:
-        """output every steps"""
-        if state_below.ndim == 3:
-            batch_size = state_below.shape[1]
-            n_steps = state_below.shape[0]
-        else:
-            raise NotImplementedError
-
-
-        if self.with_contex:
-            if init_state is None:
-                init_state = T.tanh(theano.dot(context, self.W_c_init))
-            c_z = theano.dot(context, self.W_cz)
-            c_r = theano.dot(context, self.W_cr)
-            c_h = theano.dot(context, self.W_ch)
-            non_sequences = [c_z, c_r, c_h]
-            rval, updates = theano.scan(self._step_forward_with_context,
-                                        sequences=[state_below, mask_below],
-                                        outputs_info=[init_state],
-                                        non_sequences=non_sequences,
-                                        n_steps=n_steps
-                                        )
-
-        else:
-            if init_state is None:
-                init_state = T.alloc(numpy.float32(0.), batch_size, self.n_hids)
-            rval, updates = theano.scan(self._step_forward,
-                                        sequences=[state_below, mask_below],
-                                        outputs_info=[init_state],
-                                        n_steps=n_steps
-                                        )
-        self.output = rval
-        return self.output
 
     def merge_out(self, state_below, mask_below, context=None):
         hiddens = self.apply(state_below, mask_below, context=context)
@@ -241,7 +252,7 @@ class lookup_table(object):
 
     def apply(self, indices):
         outshape = [indices.shape[i] for i
-                    in range(indices.ndim)] + [self.embsize]
+                    in range(indices.ndim)] + [self.embsize] #()
 
         return self.W[indices.flatten()].reshape(outshape)
 
@@ -275,16 +286,9 @@ class auto_encoder(object):
 
         self.cost = logistic_layer.cost(sentence[1:],
                                         sentence_mask[1:])/sentence_mask[1:].sum()
+        self.cost_entry = logistic_layer.cost_entry(sentence[1:],  # (9,5)
+                                                    sentence_mask[1:])  # predict model cost, (5)
         self.output = context
         self.params = []
         for layer in layers:
             self.params.extend(layer.params)
-
-
-
-
-
-
-
-
-

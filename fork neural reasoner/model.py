@@ -200,7 +200,7 @@ class GRU(object):
 class lookup_table(object):
     def __init__(self, embsize, vocab_size):
         self.W = param_init().uniform((vocab_size, embsize))
-        self.params = [self.W]
+        self.params \= [self.W]
         self.vocab_size = vocab_size
         self.embsize = embsize
 
@@ -209,7 +209,6 @@ class lookup_table(object):
                     in range(indices.ndim)] + [self.embsize]
 
         return self.W[indices.flatten()].reshape(outshape)
-
 
 class auto_encoder(object):
     def __init__(self, sentence, sentence_mask, vocab_size, n_in, n_hids, **kwargs):
