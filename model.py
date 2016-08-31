@@ -209,3 +209,9 @@ class Reasoner_RNN(object):
         answer = self.answer_sm.apply(self.state)
         self.answer = answer
         return self.state, self.stop, self.answer
+
+class Reasoner(object):
+    """the whole model"""
+
+    def __init__():
+        return
