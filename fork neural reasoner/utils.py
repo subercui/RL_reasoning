@@ -80,7 +80,6 @@ class param_init(object):
                 param = theano.shared(value=param, borrow=True)
             return param
 
-
 def  repeat_x(x, n_times):
     # This is black magic based on broadcasting,
     # that's why variable names don't make any sense.
