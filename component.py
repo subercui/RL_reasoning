@@ -1,42 +1,67 @@
 import theano
 import theano.tensor as T
 import numpy
-import nonlinearities
 from utils import param_init, repeat_x
 from theano.tensor.nnet import categorical_crossentropy
 
-class DenseLayer(object):
-    """
-    author: Cui Haotian
-    """
 
-    def __init__(self, input, n_in, n_out, nonlinearity=nonlinearities.rectify):
+class Dense(object):
+    def __init__(self, n_qfvector, n_state):
+        self.n_qfvector = n_qfvector
+        self.n_state = n_state
 
-        # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
-        self.W = param_init().uniform((n_in, n_out))
-        # initialize the baises b as a vector of n_out 0s
-        self.b = param_init().constant((n_out, ))
+    def _init_params(self):
+        size_qs = (self.n_qfvector, self.n_state)
+        size_ss = (self.n_state, self.n_state)
+        n_state = self.n_state
+        self.W_qs = param_init().uniform(size=size_qs)
+        self.W_ss = param_init().orth(size=size_ss)
+        self.bias = param_init().constant((n_state, ))
+        self.params = [self.W_qs, self.W_ss, self.bias]
 
-        self.nonlinearity = (nonlinearities.identity if nonlinearity is None
-                             else nonlinearity)
-        self.output = self.nonlinearity(T.dot(input, self.W) + self.b)
-        assert energy.ndim ==2
+    def apply(self, qfvector, state_tm1):
+        state = T.nnet.sigmoid(T.dot(qfvector, self.W_qs) + T.dot(state_tm1, self.W_ss) + self.bias)
+        self.state = state
+        return self.state
 
-    def get_output_for(self, input):
-        
-        assert input.ndim == 2
 
-        return self.nonlinearity(T.dot(input, self.W) + self.b)
+class Sigmoid(object):
+    def __init__(self, n_state):
+        self.n_state = n_state
+
+    def _init_params(self):
+        size_sst = (self.n_state, 1)
+        self.W_sst = param_init().uniform(size_sst)
+        self.bias = param_init().constant(1, )
+
+    def apply(self, state):
+        stop = T.nnet.sigmoid(T.dot(state, self.W_sst) + self.bias)
+        return stop
+
+
+class Softmax(object):
+    def __init__(self, n_state, n_answer_class):
+        self.n_state = n_state
+        self.n_answer_class = n_answer_class
+
+    def _init_params(self):
+        size_sa = (self.n_state, self.n_answer_class)
+        self.W_sst = param_init().uniform(size_sa)
+        self.bias = param_init().constant(self.n_answer_class, )
+
+    def apply(self, state):
+        answer = T.nnet.softmax(T.dot(state, self.W_sst) + self.bias)
+        self.answer = answer
+        return self.answer
 
 
 class LogisticRegression(object):
-
     def __init__(self, input, n_in, n_out):
 
         # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
         self.W = param_init().uniform((n_in, n_out))
         # initialize the baises b as a vector of n_out 0s
-        self.b = param_init().constant((n_out, ))
+        self.b = param_init().constant((n_out,))
 
         # compute vector of class-membership probabilities in symbolic form
         energy = theano.dot(input, self.W) + self.b
@@ -59,33 +84,16 @@ class LogisticRegression(object):
         prediction = self.p_y_given_x
 
         if prediction.ndim == 3:
-        # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
+            # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
             prediction_flat = prediction.reshape(((prediction.shape[0] *
-                                                prediction.shape[1]),
-                                                prediction.shape[2]), ndim=2)
+                                                   prediction.shape[1]),
+                                                  prediction.shape[2]), ndim=2)
             targets_flat = targets.flatten()
             mask_flat = mask.flatten()
             ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
         else:
             ce = categorical_crossentropy(prediction, targets)
         return T.sum(ce)
-
-        # liuxianggen
-    def cost_entry(self, targets, mask=None):
-        prediction = self.p_y_given_x  # (9,5,24)
-
-        if prediction.ndim == 3:
-            # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
-            prediction_flat = prediction.reshape(((prediction.shape[0] *
-                                                   prediction.shape[1]),
-                                                  prediction.shape[2]), ndim=2)  # (45,24)
-            targets_flat = targets.flatten()
-            mask_flat = mask.flatten()
-            ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
-        else:
-            ce = categorical_crossentropy(prediction, targets)
-        ce_entry = ce.reshape((prediction.shape[0], prediction.shape[1]), ndim=2).sum(axis=0)  # (5)
-        return ce_entry
 
     def errors(self, y):
         y_pred = self.y_pred
@@ -95,9 +103,7 @@ class LogisticRegression(object):
         return T.sum(T.neq(y, y_pred))
 
 
-
 class GRU(object):
-
     def __init__(self, n_in, n_hids, with_contex=False, **kwargs):
         self.n_in = n_in
         self.n_hids = n_hids
@@ -109,11 +115,11 @@ class GRU(object):
     def _init_params(self):
         n_in = self.n_in
         n_hids = self.n_hids
-        size_xh = (n_in, n_hids) #(30,39)
-        size_hh = (n_hids, n_hids) #(39,39)
-        self.W_xz = param_init().uniform(size_xh) #(30,39)
-        self.W_xr = param_init().uniform(size_xh)#(30,39)
-        self.W_xh = param_init().uniform(size_xh)#(30,39)
+        size_xh = (n_in, n_hids)
+        size_hh = (n_hids, n_hids)
+        self.W_xz = param_init().uniform(size_xh)
+        self.W_xr = param_init().uniform(size_xh)
+        self.W_xh = param_init().uniform(size_xh)
 
         self.W_hz = param_init().orth(size_hh)
         self.W_hr = param_init().orth(size_hh)
@@ -155,9 +161,8 @@ class GRU(object):
                          self.b_h)
         h_t = (1 - z_t) * h_tm1 + z_t * can_h_t
 
-        h_t = x_m[:, None] * h_t + (1. - x_m[:, None])*h_tm1
+        h_t = x_m[:, None] * h_t + (1. - x_m[:, None]) * h_tm1
         return h_t
-
 
     def _step_forward(self, x_t, x_m, h_tm1):
         '''
@@ -177,20 +182,15 @@ class GRU(object):
                          self.b_h)
         h_t = (1 - z_t) * h_tm1 + z_t * can_h_t
 
-        h_t = x_m[:, None] * h_t + (1. - x_m[:, None])*h_tm1
+        h_t = x_m[:, None] * h_t + (1. - x_m[:, None]) * h_tm1
         return h_t
 
     def apply(self, state_below, mask_below, init_state=None, context=None):
         if state_below.ndim == 3:
-            #e.g. state_below=(n_step 10, batch_size 5, vector_size 30)
             batch_size = state_below.shape[1]
             n_steps = state_below.shape[0]
         else:
             raise NotImplementedError
-
-
-        if mask_below == None:
-            mask_below = numpy.ones(state_below.shape[:2], dtype='float32')
 
         if self.with_contex:
             if init_state is None:
@@ -217,7 +217,6 @@ class GRU(object):
         self.output = rval
         return self.output
 
-
     def merge_out(self, state_below, mask_below, context=None):
         hiddens = self.apply(state_below, mask_below, context=context)
         if context is None:
@@ -231,14 +230,14 @@ class GRU(object):
             m_context = repeat_x(context, n_times)
             combine = T.concatenate([state_below, hiddens, m_context], axis=2)
 
-        self.W_m = param_init().uniform((msize, osize*2))
-        self.b_m = param_init().constant((osize*2,))
+        self.W_m = param_init().uniform((msize, osize * 2))
+        self.b_m = param_init().constant((osize * 2,))
         self.params += [self.W_m, self.b_m]
 
         merge_out = theano.dot(combine, self.W_m) + self.b_m
         merge_max = merge_out.reshape((merge_out.shape[0],
                                        merge_out.shape[1],
-                                       merge_out.shape[2]/2,
+                                       merge_out.shape[2] / 2,
                                        2), ndim=4).max(axis=3)
         return merge_max * mask_below[:, :, None]
 
@@ -252,7 +251,7 @@ class lookup_table(object):
 
     def apply(self, indices):
         outshape = [indices.shape[i] for i
-                    in range(indices.ndim)] + [self.embsize] #()
+                    in range(indices.ndim)] + [self.embsize]
 
         return self.W[indices.flatten()].reshape(outshape)
 
@@ -261,7 +260,7 @@ class auto_encoder(object):
     def __init__(self, sentence, sentence_mask, vocab_size, n_in, n_hids, **kwargs):
         layers = []
 
-        #batch_size = sentence.shape[1]
+        # batch_size = sentence.shape[1]
         encoder = GRU(n_in, n_hids, with_contex=False)
         layers.append(encoder)
 
@@ -272,7 +271,8 @@ class auto_encoder(object):
         # layers.append(table)
 
         state_below = table.apply(sentence)
-        context = encoder.apply(state_below, sentence_mask)[-1]
+        momeries = encoder.apply(state_below, sentence_mask)  # (10,5,39)
+        context = momeries[-1]
 
         decoder = GRU(n_in, n_hids, with_contex=True)
         layers.append(decoder)
@@ -285,10 +285,9 @@ class auto_encoder(object):
         layers.append(logistic_layer)
 
         self.cost = logistic_layer.cost(sentence[1:],
-                                        sentence_mask[1:])/sentence_mask[1:].sum()
-        self.cost_entry = logistic_layer.cost_entry(sentence[1:],  # (9,5)
-                                                    sentence_mask[1:])  # predict model cost, (5)
-        self.output = context
+                                        sentence_mask[1:]) / sentence_mask[1:].sum()  # predict model cost
+        self.output = momeries
         self.params = []
         for layer in layers:
             self.params.extend(layer.params)
+

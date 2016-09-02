@@ -90,6 +90,14 @@ def  repeat_x(x, n_times):
     out = a * b
     return out
 
+def  repeat_x_row(x, n_times):
+    # This is black magic based on broadcasting,
+    # that's why variable names don't make any sense.
+    a = T.shape_padaxis
+    padding = [1] * x.ndim
+    b = T.alloc(numpy.float32(1), n_times, *padding)
+    out = a * b
+    return out
 
 def adadelta(parameters,gradients,rho=0.95,eps=1e-6):
     # create variables to store intermediate updates
@@ -97,7 +105,7 @@ def adadelta(parameters,gradients,rho=0.95,eps=1e-6):
     deltas_sq = [theano.shared(numpy.zeros(p.get_value().shape, dtype='float32')) for p in parameters ]
 
     # calculates the new "average" delta for the next iteration
-    gradients_sq_new = [ rho*g_sq + (1-rho)*(g**2) for g_sq, g in izip(gradients_sq,gradients) ]
+    gradients_sq_new = [ rho*g_sq + (1-rho)*(g**2) for g_sq, g in izip(gradients_sq,gradients)]
 
     # calculates the step in direction. The square root is an approximation to getting the RMS for the average value
     deltas = [ (T.sqrt(d_sq+eps)/T.sqrt(g_sq+eps))*grad for d_sq,g_sq,grad in izip(deltas_sq,gradients_sq_new,gradients) ]
