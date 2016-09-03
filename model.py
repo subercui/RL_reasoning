@@ -215,7 +215,8 @@ class Reasoner(object):
     the whole model
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, env, **kwargs):
+        self.env = env
         self.vocab_size = kwargs.pop('vocab_size')
         self.n_in = kwargs.pop('nemb')
         self.n_qf = 2*self.n_in
@@ -256,13 +257,16 @@ class Reasoner(object):
 
 
         for t in xrange(T):
-            sf, _ = mem.read(l_idx) #(1,39)
+            sf, _ = memory.read(l_idx) #(1,39)
             qf = T.concatenate([que, sf], axis = 1)
-            ht, stop, answer = exct_net.step_forward(qfvector, state_tm1, init_flag=(t==0))
+            ht, stop, answer = exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
             state_tm1 = ht
             lt = loc_net.apply(que, ht, mem)
             l_idx = T.argmax(lt).flatten()
-            if _terminate(stop):
+            #state_tm1, stop, answer, l_idx = _step(memory, l_idx, que, state_tm1)
+            terminal = _terminate(stop)
+            reward = self.env.step(answer, terminal, y)
+            if terminal:
                 break
 
         
@@ -270,7 +274,35 @@ class Reasoner(object):
 
         return self.cost, self.decoder_cost
 
+    def _step(memory, l_idx, que, state_tm1):
+        
+        sf, _ = memory.read(l_idx) #(1,39)
+        qf = T.concatenate([que, sf], axis = 1)
+        ht, stop, answer = exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+        lt = loc_net.apply(que, ht, memory.output)
+        l_idx = T.argmax(lt).flatten()
+
+        return ht, stop, answer, l_idx
+
+
     def _terminate(stop):
         return stop > self.stp_thrd
 
+
+class Env(object):
+
+    def __init__(discount, reward, stp_penalty):
+        self.discount = discount
+        self.final_award = final_award
+        self.stp_penalty = stp_penalty
+
+    def step(answer, terminal, y):
+
+        if terminal:
+            reward = self.final_award*(answer == y)
+        else:
+            reward = self.stp_penalty
+
+        return reward
+        
 
