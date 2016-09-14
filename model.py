@@ -291,7 +291,7 @@ class Reasoner(object):
 
 class Env(object):
 
-    def __init__(discount, reward, stp_penalty):
+    def __init__(discount, final_award, stp_penalty):
         self.discount = discount
         self.final_award = final_award
         self.stp_penalty = stp_penalty
