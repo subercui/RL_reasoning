@@ -5,42 +5,37 @@ import numpy as np
 import theano
 from theano import tensor as T
 from model import Reasoner, Env
-
+from utils import *
 
 def log_likelihood_sym():
 	pass
 
 
 class Agent(object):
-
-	def __init__(**kwargs):
+	def __init__(self,**kwargs):
 		discount = kwargs['discount']
 		final_award = kwargs['final_award']
 		stp_penalty = kwargs['stp_penalty']
-
 		env = Env(discount, final_award, stp_penalty)
 		self.executor = Reasoner(env, **kwargs)
-
-		self.f_train = train()
-
+		self.f_train = self.train()
+		self.learning_rate = 0.5
 
 	def train(self):
 		x = T.lmatrix()
-	    x_mask = T.matrix()
-	    y = T.lmatrix()
-	    y_mask = T.matrix()
-	    l = T.lvector()
-	    # returns_var = T.matrix() # if needed compute this variable outside of f_train
-
-	    self.actions, returns_var, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
-
+		x_mask = T.matrix()
+		y = T.lmatrix()
+		y_mask = T.matrix()
+		l = T.lvector()
+		# returns_var = T.matrix() # if needed compute this variable outside of f_train
+		self.actions, returns_var, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
 		rl_cost = -T.mean(log_likelihood_sym * returns_var)
-		cost = combine_costs(sl_cost, decoder_cost, rl_cost)
-		grads = theano.grad(cost, agent.params)
-		updates = adam(grads, params, learning_rate=learning_rate)
+		cost = sl_cost + decoder_cost + rl_cost
+		grads = theano.grad(cost, self.executor.params)
+		updates = adadelta(grads, self.executor.params, learning_rate= self.learning_rate)
 
 		f_train = theano.function(
-			inputs=[x, x_mask, y, y_mask, l, return_var],
+			inputs=[x, x_mask, y, y_mask, l],
 			outputs=None,
 			updates=updates,
 			allow_input_downcast=True

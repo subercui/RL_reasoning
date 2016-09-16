@@ -1,9 +1,9 @@
 import theano
 import theano.tensor as T
 import numpy as np
-from layers import *
-from utils import *
 
+from utils import *
+from component import *
 class Memory(object):
     """
     author:liuxianggen
@@ -90,13 +90,13 @@ class LocationNet(object):
     def apply(self, ques, ht, mem):
 
         self.length = mem.length
-        gru_in = _prepare_inputs(ques, ht, mem)
+        gru_in = self._prepare_inputs(ques, ht, mem)
         #gru_in should be (n_steps, bat_sizes, embedding)
         assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)
 
         lencoder = GRU(gru_in.shape[2], self.n_hids, with_contex=False)
         gru_out = lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
-        dense1 = DenseLayer(gru_out.flatten(2), self.n_hids, 1)     
+        dense1 = Dense(gru_out.flatten(2), self.n_hids)
         select_w = dense1.output # shape=(mem size, 1)
         self.lt=T.nnet.softmax(select_w.T)# (1, mem size)
         return self.lt
@@ -226,7 +226,7 @@ class Reasoner(object):
         self.n_layer = kwargs.pop('n_layer')
         self.n_label = kwargs.pop('label_size')
         self.T = kwargs.pop('T')
-        self.stp_thrd = kwarg.pop('stp_thrd')
+        self.stp_thrd = kwargs.pop('stp_thrd')
         self.params=[]
 
     def apply(self, facts, facts_mask, question, question_mask, y):
@@ -242,11 +242,11 @@ class Reasoner(object):
         self.params += memory.params
         self.params += quest.params
 
-        exct_net = Reasoner_RNN(self.n_qf, self.n_hts, self.n_label)
-        self.params += exct_net.params
+        self.exct_net = Reasoner_RNN(self.n_qf, self.n_hts, self.n_label)
+        self.params += self.exct_net.params
 
-        loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1)
-        self.params += loc_net.params
+        self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1)
+        self.params += self.loc_net.params
 
 
         #init operations
@@ -259,12 +259,12 @@ class Reasoner(object):
         for t in xrange(T):
             sf, _ = memory.read(l_idx) #(1,39)
             qf = T.concatenate([que, sf], axis = 1)
-            ht, stop, answer = exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+            ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
             state_tm1 = ht
-            lt = loc_net.apply(que, ht, mem)
+            lt = self.loc_net.apply(que, ht, mem)
             l_idx = T.argmax(lt).flatten()
             #state_tm1, stop, answer, l_idx = _step(memory, l_idx, que, state_tm1)
-            terminal = _terminate(stop)
+            terminal = self._terminate(stop)
             reward = self.env.step(answer, terminal, y)
             if terminal:
                 break
@@ -274,29 +274,29 @@ class Reasoner(object):
 
         return self.cost, self.decoder_cost
 
-    def _step(memory, l_idx, que, state_tm1):
-        
-        sf, _ = memory.read(l_idx) #(1,39)
-        qf = T.concatenate([que, sf], axis = 1)
-        ht, stop, answer = exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
-        lt = loc_net.apply(que, ht, memory.output)
-        l_idx = T.argmax(lt).flatten()
+    # def _step(self,memory, l_idx, que, state_tm1):
+    #
+    #     sf, _ = memory.read(l_idx) #(1,39)
+    #     qf = T.concatenate([que, sf], axis = 1)
+    #     ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+    #     lt = self.loc_net.apply(que, ht, memory.output)
+    #     l_idx = T.argmax(lt).flatten()
+    #
+    #     return ht, stop, answer, l_idx
 
-        return ht, stop, answer, l_idx
 
-
-    def _terminate(stop):
+    def _terminate(self, stop):
         return stop > self.stp_thrd
 
 
 class Env(object):
 
-    def __init__(discount, final_award, stp_penalty):
+    def __init__(self,discount, final_award, stp_penalty):
         self.discount = discount
         self.final_award = final_award
         self.stp_penalty = stp_penalty
 
-    def step(answer, terminal, y):
+    def step(self, answer, terminal, y):
 
         if terminal:
             reward = self.final_award*(answer == y)

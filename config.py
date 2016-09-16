@@ -26,7 +26,18 @@ def get_config():
 	
 	####### dict file
 	config['dict_file'] = head_suffix +"pathfinding_19dict.pkl"
-	
-	
+
+# for RL
+	config['n_itr'] = 12
+	config['n_eps'] = 0.4
+	config['discount'] = 0.7
+	config['final_award'] = 1
+	config['stp_penalty'] = -0.1
+	config['n_grus'] = 1
+	config['n_hts'] = 1
+
+
+
+
 	
 	return config
