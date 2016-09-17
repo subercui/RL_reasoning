@@ -53,7 +53,7 @@ class Question(object):
         else:
             table = lookup_table(n_in, vocab_size)
 
-        # self.params += table.params
+        # self.params += table.params  //add already
         facts_encoder = auto_encoder(question, question_mask, self.vocab_size,
                                      self.n_in, self.n_hids, table=table)
         self.params += facts_encoder.params
@@ -87,6 +87,7 @@ class LocationNet(object):
         output = T.concatenate(ques, ht, mem.output)
         return output
 
+    # wrong, the gru needs be build in the initial function----liuxianggen
     def apply(self, ques, ht, mem):
 
         self.length = mem.length
@@ -97,6 +98,7 @@ class LocationNet(object):
         lencoder = GRU(gru_in.shape[2], self.n_hids, with_contex=False)
         gru_out = lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
         dense1 = Dense(gru_out.flatten(2), self.n_hids)
+
         select_w = dense1.output # shape=(mem size, 1)
         self.lt=T.nnet.softmax(select_w.T)# (1, mem size)
         return self.lt
@@ -196,6 +198,8 @@ class Reasoner_RNN(object):
         self.dense._init_params()
         self.stop_sig._init_params()
         self.answer_sm._init_params()
+        self.params = [self.dense.params, self.stop_sig.params]
+
 
     def step_forward(self, qfvector, state_tm1=None, init_flag=False):
         init_state = T.alloc(numpy.float32(0.), self.n_state)

@@ -30,11 +30,15 @@ def get_config():
 # for RL
 	config['n_itr'] = 12
 	config['n_eps'] = 0.4
+	config['T'] = 10
 	config['discount'] = 0.7
 	config['final_award'] = 1
 	config['stp_penalty'] = -0.1
 	config['n_grus'] = 1
-	config['n_hts'] = 1
+	config['n_hts'] = 10
+	config['n_lhids'] = 10
+	config['stp_thrd'] = 10
+
 
 
 

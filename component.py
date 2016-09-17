@@ -33,6 +33,7 @@ class Sigmoid(object):
         size_sst = (self.n_state, 1)
         self.W_sst = param_init().uniform(size_sst)
         self.bias = param_init().constant(1, )
+        self.params = [self.W_sst, self.bias]
 
     def apply(self, state):
         stop = T.nnet.sigmoid(T.dot(state, self.W_sst) + self.bias)
@@ -48,6 +49,7 @@ class Softmax(object):
         size_sa = (self.n_state, self.n_answer_class)
         self.W_sst = param_init().uniform(size_sa)
         self.bias = param_init().constant(self.n_answer_class, )
+        self.params = [self.W_sst, self.bias]
 
     def apply(self, state):
         answer = T.nnet.softmax(T.dot(state, self.W_sst) + self.bias)
@@ -94,6 +96,23 @@ class LogisticRegression(object):
         else:
             ce = categorical_crossentropy(prediction, targets)
         return T.sum(ce)
+
+    # liuxianggen
+    def cost_entry(self, targets, mask=None):
+        prediction = self.p_y_given_x  # (9,5,24)
+
+        if prediction.ndim == 3:
+            # prediction = prediction.dimshuffle(1,2,0).flatten(2).dimshuffle(1,0)
+            prediction_flat = prediction.reshape(((prediction.shape[0] *
+                                                   prediction.shape[1]),
+                                                  prediction.shape[2]), ndim=2)  # (45,24)
+            targets_flat = targets.flatten()
+            mask_flat = mask.flatten()
+            ce = categorical_crossentropy(prediction_flat, targets_flat) * mask_flat
+        else:
+            ce = categorical_crossentropy(prediction, targets)
+        ce_entry = ce.reshape((prediction.shape[0], prediction.shape[1]), ndim=2).sum(axis=0)  # (5)
+        return ce_entry
 
     def errors(self, y):
         y_pred = self.y_pred
@@ -286,6 +305,8 @@ class auto_encoder(object):
 
         self.cost = logistic_layer.cost(sentence[1:],
                                         sentence_mask[1:]) / sentence_mask[1:].sum()  # predict model cost
+        self.cost_entry = logistic_layer.cost_entry(sentence[1:],  # (9,5)
+                                                    sentence_mask[1:])  # predict model cost, (5)
         self.output = momeries
         self.params = []
         for layer in layers:
