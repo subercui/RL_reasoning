@@ -1,9 +1,9 @@
 import theano
 import theano.tensor as T
 import numpy as np
-from layers import *
-from utils import *
 
+from utils import *
+from component import *
 class Memory(object):
     """
     author:liuxianggen
@@ -25,14 +25,14 @@ class Memory(object):
         facts_encoder = auto_encoder(facts, facts_mask, self.vocab_size,
                                      self.n_in, self.n_hids, table=table)
         self.params += facts_encoder.params
-        self.output = facts_encoder.output  # (10,5,39)
+        self.output = facts_encoder.output  # (5,39)
         self.cost = facts_encoder.cost #a float
         self.cost_entry = facts_encoder.cost_entry # vector of float (5), the cost for the specific fact choosed
         self.length = self.output.shape[0]
 
     def read(self, index):
         if(index<len(self.cost_entry)):
-            return self.output[:,index,:],self.cost_entry[index]
+            return self.output[index:index+1,:],self.cost_entry[index]
         else:
             None,None
 
@@ -68,12 +68,12 @@ class LocationNet(object):
 
     def __init__(self, **kwargs):
 
-        self.n_in = kwargs.pop('n_in')
+        #self.n_in = kwargs.pop('n_in')
         self.n_hids = kwargs.pop('n_hids')
         self.n_layers = kwargs.pop('n_layers')
 
 
-    def prepare_inputs(ques, ht, mem):
+    def _prepare_inputs(ques, ht, mem):
         """
         ques:(1,qsize)
         ht:(1,htsize)
@@ -90,14 +90,13 @@ class LocationNet(object):
     def apply(self, ques, ht, mem):
 
         self.length = mem.length
-        gru_in = prepare_inputs(ques, ht, mem)
+        gru_in = self._prepare_inputs(ques, ht, mem)
         #gru_in should be (n_steps, bat_sizes, embedding)
         assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)
-        assert gru_in_mask.ndim == 3
 
-        lencoder = GRU(self.n_in, self.n_hids, with_contex=False)
+        lencoder = GRU(gru_in.shape[2], self.n_hids, with_contex=False)
         gru_out = lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
-        dense1 = DenseLayer(gru_out.flatten(2), self.n_hids, 1)     
+        dense1 = Dense(gru_out.flatten(2), self.n_hids)
         select_w = dense1.output # shape=(mem size, 1)
         self.lt=T.nnet.softmax(select_w.T)# (1, mem size)
         return self.lt
@@ -149,7 +148,7 @@ class Reasoner_lxg(object):
         self.params += quest.params
 
         mem = memory.output #(5,39)
-        que = quest.output #(39)
+        que = quest.output #(1,39)
 
         for _ in range(self.n_layer):
             que = self.interact(mem, que)
@@ -198,7 +197,7 @@ class Reasoner_RNN(object):
         self.stop_sig._init_params()
         self.answer_sm._init_params()
 
-    def _step_forward(self, qfvector, state_tm1=None, init_flag=False):
+    def step_forward(self, qfvector, state_tm1=None, init_flag=False):
         init_state = T.alloc(numpy.float32(0.), self.n_state)
         if init_flag:
             state_tm1 = init_state
@@ -211,7 +210,99 @@ class Reasoner_RNN(object):
         return self.state, self.stop, self.answer
 
 class Reasoner(object):
-    """the whole model"""
+    """
+    author: Cui Haotian
+    the whole model
+    """
 
-    def __init__():
-        return
+    def __init__(self, env, **kwargs):
+        self.env = env
+        self.vocab_size = kwargs.pop('vocab_size')
+        self.n_in = kwargs.pop('nemb')
+        self.n_qf = 2*self.n_in
+        self.n_grus = kwargs.pop('n_grus')
+        self.n_hts = kwargs.pop('n_hts')
+        self.n_lhids = kwargs.pop('n_lhids')
+        self.n_layer = kwargs.pop('n_layer')
+        self.n_label = kwargs.pop('label_size')
+        self.T = kwargs.pop('T')
+        self.stp_thrd = kwargs.pop('stp_thrd')
+        self.params=[]
+
+    def apply(self, facts, facts_mask, question, question_mask, y):
+
+        table = lookup_table(self.n_in, self.vocab_size)
+        self.params += table.params
+
+        memory = Memory(facts, facts_mask, self.vocab_size,
+                                     self.n_in, self.n_grus, table=table)
+        quest = Question(question, question_mask, self.vocab_size,
+                                         self.n_in, self.n_grus, table=table)
+
+        self.params += memory.params
+        self.params += quest.params
+
+        self.exct_net = Reasoner_RNN(self.n_qf, self.n_hts, self.n_label)
+        self.params += self.exct_net.params
+
+        self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1)
+        self.params += self.loc_net.params
+
+
+        #init operations
+        mem = memory.output #Fact Memory (5,39)
+        que = quest.output #(1,39)
+        l_idx = 0
+        state_tm1 = None
+
+
+        for t in xrange(T):
+            sf, _ = memory.read(l_idx) #(1,39)
+            qf = T.concatenate([que, sf], axis = 1)
+            ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+            state_tm1 = ht
+            lt = self.loc_net.apply(que, ht, mem)
+            l_idx = T.argmax(lt).flatten()
+            #state_tm1, stop, answer, l_idx = _step(memory, l_idx, que, state_tm1)
+            terminal = self._terminate(stop)
+            reward = self.env.step(answer, terminal, y)
+            if terminal:
+                break
+
+        
+        self.decoder_cost = mem.cost + que.cost
+
+        return self.cost, self.decoder_cost
+
+    # def _step(self,memory, l_idx, que, state_tm1):
+    #
+    #     sf, _ = memory.read(l_idx) #(1,39)
+    #     qf = T.concatenate([que, sf], axis = 1)
+    #     ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+    #     lt = self.loc_net.apply(que, ht, memory.output)
+    #     l_idx = T.argmax(lt).flatten()
+    #
+    #     return ht, stop, answer, l_idx
+
+
+    def _terminate(self, stop):
+        return stop > self.stp_thrd
+
+
+class Env(object):
+
+    def __init__(self,discount, final_award, stp_penalty):
+        self.discount = discount
+        self.final_award = final_award
+        self.stp_penalty = stp_penalty
+
+    def step(self, answer, terminal, y):
+
+        if terminal:
+            reward = self.final_award*(answer == y)
+        else:
+            reward = self.stp_penalty
+
+        return reward
+        
+
