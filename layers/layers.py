@@ -10,7 +10,7 @@ class DenseLayer(object):
     author: Cui Haotian
     """
 
-    def __init__(self, input, n_in, n_out, nonlinearity=nonlinearities.rectify):
+    def __init__(self, n_in, n_out, nonlinearity=nonlinearities.rectify):
 
         # initialize with 0 the weights W as a matrix of shape (n_in, n_out)
         self.W = param_init().uniform((n_in, n_out))
@@ -19,8 +19,6 @@ class DenseLayer(object):
 
         self.nonlinearity = (nonlinearities.identity if nonlinearity is None
                              else nonlinearity)
-        self.output = self.nonlinearity(T.dot(input, self.W) + self.b)
-        assert energy.ndim ==2
 
     def get_output_for(self, input):
         

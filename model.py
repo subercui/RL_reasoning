@@ -1,9 +1,9 @@
 import theano
 import theano.tensor as T
 import numpy as np
-
+from layers import *
 from utils import *
-from component import *
+
 class Memory(object):
     """
     author:liuxianggen
@@ -71,6 +71,10 @@ class LocationNet(object):
         #self.n_in = kwargs.pop('n_in')
         self.n_hids = kwargs.pop('n_hids')
         self.n_layers = kwargs.pop('n_layers')
+        self.emb_size = kwargs.pop('emb_size')
+
+        self.lencoder = GRU(self.emb_size, self.n_hids, with_contex=False)
+        self.dense1 = DenseLayer(self.n_hids, 1, nonlinearity=None)
 
 
     def _prepare_inputs(ques, ht, mem):
@@ -94,11 +98,9 @@ class LocationNet(object):
         #gru_in should be (n_steps, bat_sizes, embedding)
         assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)
 
-        lencoder = GRU(gru_in.shape[2], self.n_hids, with_contex=False)
-        gru_out = lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
-        dense1 = Dense(gru_out.flatten(2), self.n_hids)
-        select_w = dense1.output # shape=(mem size, 1)
-        self.lt=T.nnet.softmax(select_w.T)# (1, mem size)
+        gru_out = self.lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
+        select_w = self.dense1.get_output_for(gru_out.flatten(2)) # shape=(mem size, 1)
+        self.lt = T.nnet.softmax(select_w.T)# (1, mem size)
         return self.lt
 
 class LocationNet_lxg(object):
@@ -230,6 +232,9 @@ class Reasoner(object):
         self.params=[]
 
     def apply(self, facts, facts_mask, question, question_mask, y):
+        """
+        return: answer, cost
+        """
 
         table = lookup_table(self.n_in, self.vocab_size)
         self.params += table.params
@@ -253,17 +258,17 @@ class Reasoner(object):
         mem = memory.output #Fact Memory (5,39)
         que = quest.output #(1,39)
         l_idx = 0
-        state_tm1 = None
+        htm1 = None
 
 
         for t in xrange(T):
             sf, _ = memory.read(l_idx) #(1,39)
             qf = T.concatenate([que, sf], axis = 1)
-            ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
-            state_tm1 = ht
+            ht, stop, answer = self.exct_net.step_forward(qf, htm1, init_flag=(t==0))
+            htm1 = ht
             lt = self.loc_net.apply(que, ht, mem)
             l_idx = T.argmax(lt).flatten()
-            #state_tm1, stop, answer, l_idx = _step(memory, l_idx, que, state_tm1)
+            #htm1, stop, answer, l_idx = _step(memory, l_idx, que, htm1)
             terminal = self._terminate(stop)
             reward = self.env.step(answer, terminal, y)
             if terminal:
@@ -272,17 +277,17 @@ class Reasoner(object):
         
         self.decoder_cost = mem.cost + que.cost
 
-        return self.cost, self.decoder_cost
+        return answer, self.cost, self.decoder_cost
 
-    # def _step(self,memory, l_idx, que, state_tm1):
-    #
-    #     sf, _ = memory.read(l_idx) #(1,39)
-    #     qf = T.concatenate([que, sf], axis = 1)
-    #     ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
-    #     lt = self.loc_net.apply(que, ht, memory.output)
-    #     l_idx = T.argmax(lt).flatten()
-    #
-    #     return ht, stop, answer, l_idx
+     def _step(self,memory, l_idx, que, state_tm1):
+    
+         sf, _ = memory.read(l_idx) #(1,39)
+         qf = T.concatenate([que, sf], axis = 1)
+         ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+         lt = self.loc_net.apply(que, ht, memory.output)
+         l_idx = T.argmax(lt).flatten()
+    
+         return ht, stop, answer, l_idx
 
 
     def _terminate(self, stop):
