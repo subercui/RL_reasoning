@@ -33,6 +33,7 @@ class Sigmoid(object):
         size_sst = (self.n_state, 1)
         self.W_sst = param_init().uniform(size_sst)
         self.bias = param_init().constant(1, )
+        self.params = [self.W_sst,self.bias]
 
     def apply(self, state):
         stop = T.nnet.sigmoid(T.dot(state, self.W_sst) + self.bias)
@@ -48,6 +49,7 @@ class Softmax(object):
         size_sa = (self.n_state, self.n_answer_class)
         self.W_sst = param_init().uniform(size_sa)
         self.bias = param_init().constant(self.n_answer_class, )
+        self.params = [self.W_sst,self.bias]
 
     def apply(self, state):
         answer = T.nnet.softmax(T.dot(state, self.W_sst) + self.bias)

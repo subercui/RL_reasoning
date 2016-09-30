@@ -19,7 +19,9 @@ class Agent(object):
 		self.f_train = self.train()
 		self.learning_rate = 0.5
 
+
 	def train(self):
+
 		x = T.lmatrix()
 		x_mask = T.matrix()
 		y = T.lmatrix()
@@ -28,7 +30,8 @@ class Agent(object):
 		# returns_var = T.matrix() # if needed compute this variable outside of f_train
 		rl_cost, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
 		cost = self.combine_costs(sl_cost, decoder_cost, rl_cost)
-		grads = theano.grad(cost, self.executor.params)
+		print type(self.executor.params)
+		grads = theano.grad(cost, self.executor.paramss)
 		updates = adadelta(grads, self.executor.params, learning_rate= self.learning_rate)
 
 		f_train = theano.function(
@@ -40,7 +43,7 @@ class Agent(object):
 
 		return f_train
 
-	def combine_costs(sl_cost, decoder_cost, rl_cost):
-		return sl_cost+decoder_cost+rl_cost
+	def combine_costs(self, sl_cost, decoder_cost, rl_cost):
+		return sl_cost+ decoder_cost+ rl_cost
 
 

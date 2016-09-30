@@ -16,7 +16,7 @@ class DenseLayer(object):
         self.W = param_init().uniform((n_in, n_out))
         # initialize the baises b as a vector of n_out 0s
         self.b = param_init().constant((n_out, ))
-
+        self.params  = [self.W,self.b]
         self.nonlinearity = (nonlinearities.identity if nonlinearity is None
                              else nonlinearity)
 
@@ -183,13 +183,15 @@ class GRU(object):
             #e.g. state_below=(n_step 10, batch_size 5, vector_size 30)
             batch_size = state_below.shape[1]
             n_steps = state_below.shape[0]
+
         else:
             raise NotImplementedError
 
 
         if mask_below == None:
-            mask_below = numpy.ones(state_below.shape[:2], dtype='float32')
-
+            mask_below = T.ones(state_below.shape[:2], dtype='float32')
+            # mask_below = T.ones_like(state_below,'float32')
+            print mask_below
         if self.with_contex:
             if init_state is None:
                 init_state = T.tanh(theano.dot(context, self.W_c_init))

@@ -1,10 +1,11 @@
 import theano
 import theano.tensor as T
+import theano.tensor.extra_ops as Ops
 from theano.tensor.nnet import categorical_crossentropy
 import numpy as np
-from layers.layers import GRU,lookup_table,auto_encoder
+from layers.layers import DenseLayer,GRU,lookup_table,auto_encoder,LogisticRegression
 from utils import *
-
+from component import Dense,Sigmoid,Softmax
 TINY = 1e-8
 
 class Memory(object):
@@ -32,9 +33,11 @@ class Memory(object):
         self.cost = facts_encoder.cost #a float
         self.cost_entry = facts_encoder.cost_entry # vector of float (5), the cost for the specific fact choosed
         self.length = self.output.shape[0]
+        print self.length
 
     def read(self, index):
-        if(index<len(self.cost_entry)):
+
+        if(T.lt(index,self.cost_entry.shape[0])):
             return self.output[index:index+1,:],self.cost_entry[index]
         else:
             None,None
@@ -78,9 +81,9 @@ class LocationNet(object):
 
         self.lencoder = GRU(self.emb_size, self.n_hids, with_contex=False)
         self.dense1 = DenseLayer(self.n_hids, 1, nonlinearity=None)
+        self.params = self.lencoder.params + self.dense1.params
 
-
-    def _prepare_inputs(ques, ht, mem):
+    def _prepare_inputs(self, ques, ht, mem):
         """
         ques:(1,qsize)
         ht:(1,htsize)
@@ -88,20 +91,20 @@ class LocationNet(object):
 
         output:(mem size,1,qsize+htsize+embedding )
         """
-
         ques = repeat_x(ques, mem.length)
         ht = repeat_x(ht, mem.length)
-        output = T.concatenate(ques, ht, mem.output)
+
+        output = T.concatenate([ques, ht, mem.output.dimshuffle((0,'x',1))],axis=2)
         return output
 
     def apply(self, ques, ht, mem):
 
-        self.length = mem.length
+        #  self.length = mem.length
         gru_in = self._prepare_inputs(ques, ht, mem)
         #gru_in should be (n_steps, bat_sizes, embedding)
         assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)
 
-        gru_out = self.lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
+        gru_out = self.lencoder.apply(gru_in, mask_below = None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
         select_w = self.dense1.get_output_for(gru_out.flatten(2)) # shape=(mem size, 1)
         self.lt = T.nnet.softmax(select_w.T)# (1, mem size)
         return self.lt
@@ -201,6 +204,7 @@ class Reasoner_RNN(object):
         self.dense._init_params()
         self.stop_sig._init_params()
         self.answer_sm._init_params()
+        self.params = self.dense.params + self.stop_sig.params + self.answer_sm.params
 
     def step_forward(self, qfvector, state_tm1=None, init_flag=False):
         init_state = T.alloc(numpy.float32(0.), self.n_state)
@@ -213,9 +217,9 @@ class Reasoner_RNN(object):
         answer = self.answer_sm.apply(self.state)
         self.answer = answer
         return self.state, self.stop, self.answer
-
-    def dist_info_sym(self, obs_var, state_info_vars=None):
-        return dict(prob=L.get_output(self._l_prob, {self._l_obs: obs_var}))
+    #
+    # def dist_info_sym(self, obs_var, state_info_vars=None):
+    #     return dict(prob=L.get_output(self._l_prob, {self._l_obs: obs_var}))
 
 class Reasoner(object):
     """
@@ -236,6 +240,7 @@ class Reasoner(object):
         self.T = kwargs.pop('T')
         self.stp_thrd = kwargs.pop('stp_thrd')
         self.params=[]
+        self.paramss = []
 
     def apply(self, facts, facts_mask, question, question_mask, y):
         """
@@ -244,6 +249,7 @@ class Reasoner(object):
 
         table = lookup_table(self.n_in, self.vocab_size)
         self.params += table.params
+
 
         memory = Memory(facts, facts_mask, self.vocab_size,
                                      self.n_in, self.n_grus, table=table)
@@ -256,12 +262,13 @@ class Reasoner(object):
         self.exct_net = Reasoner_RNN(self.n_qf, self.n_hts, self.n_label)
         self.params += self.exct_net.params
 
-        self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1)
+        self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1,emb_size=self.n_in)
         self.params += self.loc_net.params
+        self.paramss += self.loc_net.params
 
 
         #init operations
-        mem = memory.output #Fact Memory (5,39)
+        # mem = memory.output #Fact Memory (5,39)
         que = quest.output #(1,39)
         l_idx = 0
         htm1 = None
@@ -274,64 +281,85 @@ class Reasoner(object):
         lts = []
         rewards = []
 
-        for t in xrange(T):
+        for t in xrange(self.T):
             sf, _ = memory.read(l_idx) #(1,39)
             qf = T.concatenate([que, sf], axis = 1)
             ht, stop_dist, answer_dist = self.exct_net.step_forward(qf, htm1, init_flag=(t==0))
             htm1 = ht
-            lt_dist = self.loc_net.apply(que, ht, mem)
-            l_idx = T.argmax(lt_dist).flatten() #hard attention
+            lt_dist = self.loc_net.apply(que, ht, memory)
+            l_idx = T.argmax(lt_dist) #hard attention
             #htm1, stop, answer, l_idx = _step(memory, l_idx, que, htm1)
 
 
             answer = T.argmax(answer_dist)
+
             #TODO: implement a real sampling
-            terminal = self._terminate(stop_dist)
+            terminal = self._terminate(stop_dist[0,0])
             reward = self.env.step(answer, terminal, y)
 
             stops_dist.append(stop_dist)
             answers_dist.append(answer_dist)
             lts_dist.append(lt_dist)
-            stops.append(stop)
+            stops.append(terminal)
             answers.append(answer)
             lts.append(l_idx)
             rewards.append(reward)
 
-            if terminal:
+            if T.gt(terminal,0):
                 break
 
-        stops_dist = T.stack(stops_dist,axis=0)
-        answers_dist = T.stack(answers_dist,axis=0)
-        lts_dist = T.stack(lts_dist,axis=0)
-        stops = T.stack(stops,axis=0)
-        answers = T.stack(answers,axis=0)
-        lts = T.stack(lts,axis=0)
-        rewards = T.sum(rewards,axis=0)
+        stops_dist = T.concatenate(stops_dist,axis=0)#ndim=2
+        answers_dist = T.concatenate(answers_dist,axis=0)#ndim=2
+        lts_dist = T.concatenate(lts_dist,axis=0)#ndim=2
+        stops = T.stack(stops,axis=0)#ndim=1
+        answers = T.stack(answers,axis=0)#ndim=1
+        lts = T.stack(lts,axis=0)#ndim=1
+        rewards = T.stack(rewards,axis=0)#ndim=1
 
-        
-        self.decoder_cost = mem.cost + que.cost
+        self.decoder_cost = memory.cost + quest.cost
+        self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))
 
-        self.sl_cost = categorical_crossentropy(answer_dist, y)
+        # print(answers_dist.ndim)
+
+
 
         stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * rewards
         answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * rewards
-        lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': ltss_dist}) * rewards
-        self.rl_cost = -T.mean([stop_cost, answer_cost, lt_cost])
+        lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': lts_dist}) * rewards
+        # print(rewards.ndim)
+        # print(stop_cost.ndim)
+        # print(answer_cost.ndim)
+
+        self.rl_cost = -T.mean(stop_cost+answer_cost+lt_cost)
         #TODO: we need to improve this rl_cost to introduce anti-variance measures
+
+        print self.rl_cost.ndim
+        print self.sl_cost.ndim
+        print self.decoder_cost.ndim
 
         return self.rl_cost, self.sl_cost, self.decoder_cost
 
 
-    def log_likelihood_sym(self, x_var, dist_info_vars):
+    def log_likelihood_sym(self, actions_var, dist_info_vars):
         """
         PS: x_var should be the samples from the distributions represented with dist_info_vars
         """
         probs = dist_info_vars["prob"]
         # Assume layout is N * A
-        return TT.log(TT.sum(probs * TT.cast(x_var, 'float32'), axis=-1) + TINY)
+        # i=0
+        # while(T.lt(i,actions_var.shape[0])):
+        #     ress = probs[i,actions_var[i]]
+        # res = T.log(ress + TINY)
+
+        oneHot = Ops.to_one_hot(actions_var,probs.shape[1])
+        res = T.log(T.sum(probs*T.cast(oneHot,'float32'),axis=-1)+TINY)
+        # print probs.ndim
+        # print oneHot.ndim
+        # print res.ndim
+        return res
 
 
-    def _step(self,memory, l_idx, que, state_tm1):
+    def _step(self,memory, l_idx, que, state_tm1,t):
     
          sf, _ = memory.read(l_idx) #(1,39)
          qf = T.concatenate([que, sf], axis = 1)
@@ -354,7 +382,7 @@ class Env(object):
 
     def step(self, answer, terminal, y):
 
-        if terminal:
+        if T.gt(terminal,0):
             reward = self.final_award*(answer == y)
         else:
             reward = self.stp_penalty

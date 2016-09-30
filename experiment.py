@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 
 import config
 
+# config = getattr(config, 'get_config')()
+# data_class = preprocess(*config['train_file'])
+# for facts, question, label in data_class.data_stream():
+# 	print label
+
 if __name__ == '__main__':
 
 	config = getattr(config, 'get_config')()
@@ -25,7 +30,7 @@ if __name__ == '__main__':
 	n_eps = config['n_eps']
 
 	agent = Agent(**config)
-	data_class = preprocess(*train_files)
+	data_class = preprocess(*config['train_file'])
 	for _ in xrange(n_itr):
 		
 		paths = []
