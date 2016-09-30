@@ -7,12 +7,9 @@ from theano import tensor as T
 from model import Reasoner, Env
 from utils import *
 
-def log_likelihood_sym():
-
-	pass
-
 
 class Agent(object):
+
 	def __init__(self,**kwargs):
 		discount = kwargs['discount']
 		final_award = kwargs['final_award']
@@ -30,9 +27,8 @@ class Agent(object):
 		y_mask = T.matrix()
 		l = T.lvector()
 		# returns_var = T.matrix() # if needed compute this variable outside of f_train
-		self.actions, returns_var, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
-		rl_cost = -T.mean(self.log_likelihood_sym(actions_var, dist_info_vars) * returns_var)
-		cost = combine_costs(sl_cost, decoder_cost, rl_cost)
+		rl_cost, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
+		cost = self.combine_costs(sl_cost, decoder_cost, rl_cost)
 		grads = theano.grad(cost, self.executor.params)
 		updates = adadelta(grads, self.executor.params, learning_rate= self.learning_rate)
 
@@ -44,5 +40,8 @@ class Agent(object):
 			)
 
 		return f_train
+
+	def combine_costs(sl_cost, decoder_cost, rl_cost):
+		return sl_cost+decoder_cost+rl_cost
 
 

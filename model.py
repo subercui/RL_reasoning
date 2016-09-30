@@ -1,8 +1,11 @@
 import theano
 import theano.tensor as T
+from theano.tensor.nnet import categorical_crossentropy
 import numpy as np
 from layers import *
 from utils import *
+
+TINY = 1e-8
 
 class Memory(object):
     """
@@ -211,6 +214,9 @@ class Reasoner_RNN(object):
         self.answer = answer
         return self.state, self.stop, self.answer
 
+    def dist_info_sym(self, obs_var, state_info_vars=None):
+        return dict(prob=L.get_output(self._l_prob, {self._l_obs: obs_var}))
+
 class Reasoner(object):
     """
     author: Cui Haotian
@@ -260,26 +266,72 @@ class Reasoner(object):
         l_idx = 0
         htm1 = None
 
+        stops_dist = []
+        answers_dist = []
+        lts_dist = []
+        stops = []
+        answers = []
+        lts = []
+        rewards = []
 
         for t in xrange(T):
             sf, _ = memory.read(l_idx) #(1,39)
             qf = T.concatenate([que, sf], axis = 1)
-            ht, stop, answer = self.exct_net.step_forward(qf, htm1, init_flag=(t==0))
+            ht, stop_dist, answer_dist = self.exct_net.step_forward(qf, htm1, init_flag=(t==0))
             htm1 = ht
-            lt = self.loc_net.apply(que, ht, mem)
-            l_idx = T.argmax(lt).flatten()
+            lt_dist = self.loc_net.apply(que, ht, mem)
+            l_idx = T.argmax(lt_dist).flatten() #hard attention
             #htm1, stop, answer, l_idx = _step(memory, l_idx, que, htm1)
-            terminal = self._terminate(stop)
+
+
+            answer = T.argmax(answer_dist)
+            #TODO: implement a real sampling
+            terminal = self._terminate(stop_dist)
             reward = self.env.step(answer, terminal, y)
+
+            stops_dist.append(stop_dist)
+            answers_dist.append(answer_dist)
+            lts_dist.append(lt_dist)
+            stops.append(stop)
+            answers.append(answer)
+            lts.append(l_idx)
+            rewards.append(reward)
+
             if terminal:
                 break
+
+        stops_dist = T.stack(stops_dist,axis=0)
+        answers_dist = T.stack(answers_dist,axis=0)
+        lts_dist = T.stack(lts_dist,axis=0)
+        stops = T.stack(stops,axis=0)
+        answers = T.stack(answers,axis=0)
+        lts = T.stack(lts,axis=0)
+        rewards = T.sum(rewards,axis=0)
 
         
         self.decoder_cost = mem.cost + que.cost
 
-        return answer, self.cost, self.decoder_cost
+        self.sl_cost = categorical_crossentropy(answer_dist, y)
 
-     def _step(self,memory, l_idx, que, state_tm1):
+        stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * rewards
+        answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * rewards
+        lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': ltss_dist}) * rewards
+        self.rl_cost = -T.mean([stop_cost, answer_cost, lt_cost])
+        #TODO: we need to improve this rl_cost to introduce anti-variance measures
+
+        return self.rl_cost, self.sl_cost, self.decoder_cost
+
+
+    def log_likelihood_sym(self, x_var, dist_info_vars):
+        """
+        PS: x_var should be the samples from the distributions represented with dist_info_vars
+        """
+        probs = dist_info_vars["prob"]
+        # Assume layout is N * A
+        return TT.log(TT.sum(probs * TT.cast(x_var, 'float32'), axis=-1) + TINY)
+
+
+    def _step(self,memory, l_idx, que, state_tm1):
     
          sf, _ = memory.read(l_idx) #(1,39)
          qf = T.concatenate([que, sf], axis = 1)
