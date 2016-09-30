@@ -7,17 +7,15 @@ from theano import tensor as T
 from model import Reasoner, Env
 from utils import *
 
-def log_likelihood_sym():
-	pass
-
 
 class Agent(object):
+
 	def __init__(self,**kwargs):
-		discount = kwargs['discount']
 		final_award = kwargs['final_award']
 		stp_penalty = kwargs['stp_penalty']
-		env = Env(discount, final_award, stp_penalty)
+		env = Env(final_award, stp_penalty)
 		self.executor = Reasoner(env, **kwargs)
+
 		self.f_train = self.train()
 		self.learning_rate = 0.5
 
@@ -28,19 +26,21 @@ class Agent(object):
 		y_mask = T.matrix()
 		l = T.lvector()
 		# returns_var = T.matrix() # if needed compute this variable outside of f_train
-		self.actions, returns_var, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
-		rl_cost = -T.mean(log_likelihood_sym * returns_var)
-		cost = sl_cost + decoder_cost + rl_cost
+		rl_cost, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
+		cost = self.combine_costs(sl_cost, decoder_cost, rl_cost)
 		grads = theano.grad(cost, self.executor.params)
 		updates = adadelta(grads, self.executor.params, learning_rate= self.learning_rate)
 
 		f_train = theano.function(
 			inputs=[x, x_mask, y, y_mask, l],
-			outputs=None,
+			outputs=cost,
 			updates=updates,
 			allow_input_downcast=True
 			)
 
 		return f_train
+
+	def combine_costs(sl_cost, decoder_cost, rl_cost):
+		return sl_cost+decoder_cost+rl_cost
 
 

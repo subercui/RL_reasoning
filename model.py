@@ -1,9 +1,12 @@
 import theano
 import theano.tensor as T
+from theano.tensor.nnet import categorical_crossentropy
 import numpy as np
-
+from layers.layers import GRU,lookup_table,auto_encoder
 from utils import *
-from component import *
+
+TINY = 1e-8
+
 class Memory(object):
     """
     author:liuxianggen
@@ -71,6 +74,10 @@ class LocationNet(object):
         #self.n_in = kwargs.pop('n_in')
         self.n_hids = kwargs.pop('n_hids')
         self.n_layers = kwargs.pop('n_layers')
+        self.emb_size = kwargs.pop('emb_size')
+
+        self.lencoder = GRU(self.emb_size, self.n_hids, with_contex=False)
+        self.dense1 = DenseLayer(self.n_hids, 1, nonlinearity=None)
 
 
     def _prepare_inputs(ques, ht, mem):
@@ -94,11 +101,9 @@ class LocationNet(object):
         #gru_in should be (n_steps, bat_sizes, embedding)
         assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)
 
-        lencoder = GRU(gru_in.shape[2], self.n_hids, with_contex=False)
-        gru_out = lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
-        dense1 = Dense(gru_out.flatten(2), self.n_hids)
-        select_w = dense1.output # shape=(mem size, 1)
-        self.lt=T.nnet.softmax(select_w.T)# (1, mem size)
+        gru_out = self.lencoder.apply(gru_in, mask_below=None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
+        select_w = self.dense1.get_output_for(gru_out.flatten(2)) # shape=(mem size, 1)
+        self.lt = T.nnet.softmax(select_w.T)# (1, mem size)
         return self.lt
 
 class LocationNet_lxg(object):
@@ -209,6 +214,9 @@ class Reasoner_RNN(object):
         self.answer = answer
         return self.state, self.stop, self.answer
 
+    def dist_info_sym(self, obs_var, state_info_vars=None):
+        return dict(prob=L.get_output(self._l_prob, {self._l_obs: obs_var}))
+
 class Reasoner(object):
     """
     author: Cui Haotian
@@ -230,6 +238,9 @@ class Reasoner(object):
         self.params=[]
 
     def apply(self, facts, facts_mask, question, question_mask, y):
+        """
+        return: answer, cost
+        """
 
         table = lookup_table(self.n_in, self.vocab_size)
         self.params += table.params
@@ -253,36 +264,82 @@ class Reasoner(object):
         mem = memory.output #Fact Memory (5,39)
         que = quest.output #(1,39)
         l_idx = 0
-        state_tm1 = None
+        htm1 = None
 
+        stops_dist = []
+        answers_dist = []
+        lts_dist = []
+        stops = []
+        answers = []
+        lts = []
+        rewards = []
 
         for t in xrange(T):
             sf, _ = memory.read(l_idx) #(1,39)
             qf = T.concatenate([que, sf], axis = 1)
-            ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
-            state_tm1 = ht
-            lt = self.loc_net.apply(que, ht, mem)
-            l_idx = T.argmax(lt).flatten()
-            #state_tm1, stop, answer, l_idx = _step(memory, l_idx, que, state_tm1)
-            terminal = self._terminate(stop)
+            ht, stop_dist, answer_dist = self.exct_net.step_forward(qf, htm1, init_flag=(t==0))
+            htm1 = ht
+            lt_dist = self.loc_net.apply(que, ht, mem)
+            l_idx = T.argmax(lt_dist).flatten() #hard attention
+            #htm1, stop, answer, l_idx = _step(memory, l_idx, que, htm1)
+
+
+            answer = T.argmax(answer_dist)
+            #TODO: implement a real sampling
+            terminal = self._terminate(stop_dist)
             reward = self.env.step(answer, terminal, y)
+
+            stops_dist.append(stop_dist)
+            answers_dist.append(answer_dist)
+            lts_dist.append(lt_dist)
+            stops.append(stop)
+            answers.append(answer)
+            lts.append(l_idx)
+            rewards.append(reward)
+
             if terminal:
                 break
+
+        stops_dist = T.stack(stops_dist,axis=0)
+        answers_dist = T.stack(answers_dist,axis=0)
+        lts_dist = T.stack(lts_dist,axis=0)
+        stops = T.stack(stops,axis=0)
+        answers = T.stack(answers,axis=0)
+        lts = T.stack(lts,axis=0)
+        rewards = T.sum(rewards,axis=0)
 
         
         self.decoder_cost = mem.cost + que.cost
 
-        return self.cost, self.decoder_cost
+        self.sl_cost = categorical_crossentropy(answer_dist, y)
 
-    # def _step(self,memory, l_idx, que, state_tm1):
-    #
-    #     sf, _ = memory.read(l_idx) #(1,39)
-    #     qf = T.concatenate([que, sf], axis = 1)
-    #     ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
-    #     lt = self.loc_net.apply(que, ht, memory.output)
-    #     l_idx = T.argmax(lt).flatten()
-    #
-    #     return ht, stop, answer, l_idx
+        stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * rewards
+        answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * rewards
+        lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': ltss_dist}) * rewards
+        self.rl_cost = -T.mean([stop_cost, answer_cost, lt_cost])
+        #TODO: we need to improve this rl_cost to introduce anti-variance measures
+
+        return self.rl_cost, self.sl_cost, self.decoder_cost
+
+
+    def log_likelihood_sym(self, x_var, dist_info_vars):
+        """
+        PS: x_var should be the samples from the distributions represented with dist_info_vars
+        """
+        probs = dist_info_vars["prob"]
+        # Assume layout is N * A
+        return TT.log(TT.sum(probs * TT.cast(x_var, 'float32'), axis=-1) + TINY)
+
+
+    def _step(self,memory, l_idx, que, state_tm1):
+    
+         sf, _ = memory.read(l_idx) #(1,39)
+         qf = T.concatenate([que, sf], axis = 1)
+         ht, stop, answer = self.exct_net.step_forward(qf, state_tm1, init_flag=(t==0))
+         lt = self.loc_net.apply(que, ht, memory.output)
+         l_idx = T.argmax(lt).flatten()
+    
+         return ht, stop, answer, l_idx
 
 
     def _terminate(self, stop):
@@ -291,8 +348,7 @@ class Reasoner(object):
 
 class Env(object):
 
-    def __init__(self,discount, final_award, stp_penalty):
-        self.discount = discount
+    def __init__(self, final_award, stp_penalty):
         self.final_award = final_award
         self.stp_penalty = stp_penalty
 

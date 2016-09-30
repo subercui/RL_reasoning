@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*- 
 import sys
 sys.path.insert(0, "./dataProcess/")
 from stream import preprocess
@@ -28,12 +29,19 @@ if __name__ == '__main__':
 	for _ in xrange(n_itr):
 		
 		paths = []
-        #
-		# for _ in xrange(N):
-		# 	observations = []
-		# 	actions = []
-		# 	rewards = []
+        
+		for facts, question, label in data_class.data_stream():
+			observations = []
+			actions = []
+			rewards = []
+
+			#there should fullfill an episode, takes in facts, questions , labels
+			#return answer results, and rewards. The episode including interaction
+			# with env is all done in  f_train, which will intricically call reasoner.apply
+			agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
+
+			#实际上这是个不好的写法，我们应该尽量减少theano内部内容？比如与环境交互的部分移出去？
 
 		#this episode finishes, compute all cost, train backward
-		for facts, question, label in data_class.data_stream():
-			sums = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)[1]
+		#for facts, question, label in data_class.data_stream():
+		#	sums = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)[1]
