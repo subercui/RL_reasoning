@@ -2,7 +2,7 @@ import theano
 import theano.tensor as T
 from theano.tensor.nnet import categorical_crossentropy
 import numpy as np
-from layers import *
+from layers.layers import GRU,lookup_table,auto_encoder
 from utils import *
 
 TINY = 1e-8
@@ -348,8 +348,7 @@ class Reasoner(object):
 
 class Env(object):
 
-    def __init__(self,discount, final_award, stp_penalty):
-        self.discount = discount
+    def __init__(self, final_award, stp_penalty):
         self.final_award = final_award
         self.stp_penalty = stp_penalty
 

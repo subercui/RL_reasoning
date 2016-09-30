@@ -11,10 +11,9 @@ from utils import *
 class Agent(object):
 
 	def __init__(self,**kwargs):
-		discount = kwargs['discount']
 		final_award = kwargs['final_award']
 		stp_penalty = kwargs['stp_penalty']
-		env = Env(discount, final_award, stp_penalty)
+		env = Env(final_award, stp_penalty)
 		self.executor = Reasoner(env, **kwargs)
 
 		self.f_train = self.train()
@@ -34,7 +33,7 @@ class Agent(object):
 
 		f_train = theano.function(
 			inputs=[x, x_mask, y, y_mask, l],
-			outputs=None,
+			outputs=cost,
 			updates=updates,
 			allow_input_downcast=True
 			)

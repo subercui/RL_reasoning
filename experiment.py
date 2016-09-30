@@ -1,3 +1,4 @@
+# -*- coding:utf-8 -*- 
 import sys
 sys.path.insert(0, "./dataProcess/")
 from stream import preprocess
@@ -37,7 +38,7 @@ if __name__ == '__main__':
 			#there should fullfill an episode, takes in facts, questions , labels
 			#return answer results, and rewards. The episode including interaction
 			# with env is all done in  f_train, which will intricically call reasoner.apply
-			agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)[1]
+			agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
 
 			#实际上这是个不好的写法，我们应该尽量减少theano内部内容？比如与环境交互的部分移出去？
 
