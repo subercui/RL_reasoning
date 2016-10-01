@@ -16,6 +16,7 @@ class DenseLayer(object):
         self.W = param_init().uniform((n_in, n_out))
         # initialize the baises b as a vector of n_out 0s
         self.b = param_init().constant((n_out, ))
+        self.params = [self.W, self.b]
 
         self.nonlinearity = (nonlinearities.identity if nonlinearity is None
                              else nonlinearity)
