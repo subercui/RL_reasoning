@@ -39,7 +39,7 @@ if __name__ == '__main__':
 			observations = []
 			actions = []
 			rewards = []
-
+			print facts[0].T
 			#there should fullfill an episode, takes in facts, questions , labels
 			#return answer results, and rewards. The episode including interaction
 			# with env is all done in  f_train, which will intricically call reasoner.apply

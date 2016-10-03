@@ -15,9 +15,9 @@ class Agent(object):
 		stp_penalty = kwargs['stp_penalty']
 		env = Env(final_award, stp_penalty)
 		self.executor = Reasoner(env, **kwargs)
-
-		self.f_train = self.train()
 		self.learning_rate = 0.5
+		self.f_train = self.train()
+
 
 
 	def train(self):
@@ -30,9 +30,9 @@ class Agent(object):
 		# returns_var = T.matrix() # if needed compute this variable outside of f_train
 		rl_cost, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
 		cost = self.combine_costs(sl_cost, decoder_cost, rl_cost)
-		print type(self.executor.params)
-		grads = theano.grad(cost, self.executor.paramss)
-		updates = adadelta(grads, self.executor.params, learning_rate= self.learning_rate)
+
+		grads = theano.grad(decoder_cost, self.executor.paramss)
+		updates = adadelta(self.executor.paramss,grads)
 
 		f_train = theano.function(
 			inputs=[x, x_mask, y, y_mask, l],
