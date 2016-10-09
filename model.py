@@ -166,7 +166,7 @@ class Reasoner(object):
 
         table = lookup_table(self.n_in, self.vocab_size)
         self.params += table.params
-
+        self.paramss +=  table.params
 
         memory = Memory(facts, facts_mask, self.vocab_size,
                                      self.n_in, self.n_grus, table=table)
@@ -181,7 +181,7 @@ class Reasoner(object):
 
         self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1,emb_size=self.n_in)
         self.params += self.loc_net.params
-        self.paramss += self.loc_net.params
+
 
 
         #init operations
