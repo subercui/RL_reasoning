@@ -9,7 +9,7 @@ def get_config():
 	config['vocab_size'] = 24
 	config['label_size'] = 12
 
-	datadir ='/home/lxg/workspace-python/RL_reasoning/data/'
+	datadir ='/Users/subercui/Git/RL_reasoning/data/'
 
 	### raw training data and test data ###
 	raw_train_file = datadir + 'qa19_path-finding_train.txt'

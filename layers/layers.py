@@ -208,7 +208,11 @@ class GRU(object):
 
         else:
             if init_state is None:
-                init_state = T.alloc(numpy.float32(0.), batch_size, self.n_hids)
+                # init_state = T.alloc(numpy.float32(0.), batch_size, self.n_hids)
+                # here if the batch_size = 1, it will meet the error:
+                # "Inconsistency in the inner graph of scan 'scan_fn' : an input and an output are associated with the same recurrent state and should have the same type but have type 'TensorType(float32, row)' and 'TensorType(float32, matrix)' respectively.")
+                # so I correct this line to the below
+                init_state = T.unbroadcast(T.alloc(numpy.float32(0.), batch_size, self.n_hids), 0)
             rval, updates = theano.scan(self._step_forward,
                                         sequences=[state_below, mask_below],
                                         outputs_info=[init_state],
