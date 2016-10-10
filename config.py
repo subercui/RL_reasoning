@@ -34,7 +34,7 @@ def get_config():
 	config['final_award'] = 1
 	config['stp_penalty'] = -0.1
 	# for model
-	config['n_grus'] = 2
+	config['n_grus'] = 4
 	config['n_hts'] = 2
 	config['n_lhids'] = 2
 	config['T'] = 3

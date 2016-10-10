@@ -12,7 +12,7 @@ import config
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-theano.config.exception_verbosity = 'high'
+# theano.config.exception_verbosity = 'high'
 theano.config.optimizer = 'None'
 
 # config = getattr(config, 'get_config')()
@@ -39,6 +39,7 @@ if __name__ == '__main__':
             actions = []
             rewards = []
             print facts[0].T
+            print facts[0].T.shape, facts[1].T.shape, question[0].T.shape, question[1].T.shape, label.shape
             # there should fullfill an episode, takes in facts, questions , labels
             # return answer results, and rewards. The episode including interaction
             # with env is all done in  f_train, which will intricically call reasoner.apply

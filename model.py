@@ -74,12 +74,11 @@ class LocationNet(object):
 
     def __init__(self, **kwargs):
 
-        #self.n_in = kwargs.pop('n_in')
         self.n_hids = kwargs.pop('n_hids')
         self.n_layers = kwargs.pop('n_layers')
-        self.emb_size = kwargs.pop('emb_size')
+        self.n_in = kwargs.pop('n_in')
 
-        self.lencoder = GRU(self.emb_size, self.n_hids, with_contex=False)
+        self.lencoder = GRU(self.n_in, self.n_hids, with_contex=False)
         self.dense1 = DenseLayer(self.n_hids, 1, nonlinearity=None)
         self.params = self.lencoder.params + self.dense1.params
 
@@ -101,8 +100,8 @@ class LocationNet(object):
 
         #  self.length = mem.length
         gru_in = self._prepare_inputs(ques, ht, mem)
-        #gru_in should be (n_steps, bat_sizes, embedding)
-        assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)
+        #gru_in should be (n_steps, batch_sizes, embedding)
+        assert gru_in.ndim == 3 # shape=(tstep/mem size/batch size, 1, vector size)(5,1,10)
 
         gru_out = self.lencoder.apply(gru_in, mask_below = None) # gru_out shape=(tstep/mem size/batch size, 1, n_hids)
         select_w = self.dense1.get_output_for(gru_out.flatten(2)) # shape=(mem size, 1)
@@ -148,8 +147,8 @@ class Reasoner(object):
         self.env = env
         self.vocab_size = kwargs.pop('vocab_size')
         self.n_in = kwargs.pop('nemb')
-        self.n_qf = 2*self.n_in
         self.n_grus = kwargs.pop('n_grus')
+        self.n_qf = 2 * self.n_grus
         self.n_hts = kwargs.pop('n_hts')
         self.n_lhids = kwargs.pop('n_lhids')
         self.n_layer = kwargs.pop('n_layer')
@@ -161,6 +160,7 @@ class Reasoner(object):
 
     def apply(self, facts, facts_mask, question, question_mask, y):
         """
+        layout: (10, 5) (10, 5) (13, 1) (13, 1) (1,)
         return: answer, cost
         """
 
@@ -179,14 +179,15 @@ class Reasoner(object):
         self.exct_net = Reasoner_RNN(self.n_qf, self.n_hts, self.n_label)
         self.params += self.exct_net.params
 
-        self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1,emb_size=self.n_in)
+        self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1,n_in=self.n_qf+self.n_hts)
         self.params += self.loc_net.params
 
 
 
         #init operations
-        # mem = memory.output #Fact Memory (5,39)
-        que = quest.output #(1,39)
+        # mem = memory.output #Fact Memory (5,n_grus=4)
+        que = quest.output #(1,n_grus=4)
+
         l_idx = 0
         htm1 = None
 
@@ -199,8 +200,8 @@ class Reasoner(object):
         rewards = []
 
         for t in xrange(self.T):
-            sf, _ = memory.read(l_idx) #(1,39)
-            qf = T.concatenate([que, sf], axis = 1)
+            sf, _ = memory.read(l_idx) #(1,n_grus=4)
+            qf = T.concatenate([que, sf], axis = 1) #layout: (1, 2*n_grus=8)
             ht, stop_dist, answer_dist = self.exct_net.step_forward(qf, htm1, init_flag=(t==0))
             htm1 = ht
             lt_dist = self.loc_net.apply(que, ht, memory)
