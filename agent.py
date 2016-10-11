@@ -31,7 +31,7 @@ class Agent(object):
 
         f_train = theano.function(
             inputs=[x, x_mask, y, y_mask, l],
-            outputs=cost,
+            outputs=[rl_cost,sl_cost,decoder_cost],
             updates=updates,
             allow_input_downcast=True
         )

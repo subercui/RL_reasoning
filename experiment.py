@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # theano.config.exception_verbosity = 'high'
-theano.config.optimizer = 'None'
+theano.config.optimizer = 'fast_compile'
 
 # config = getattr(config, 'get_config')()
 # data_class = preprocess(*config['train_file'])
@@ -38,12 +38,12 @@ if __name__ == '__main__':
             observations = []
             actions = []
             rewards = []
-            print facts[0].T
-            print facts[0].T.shape, facts[1].T.shape, question[0].T.shape, question[1].T.shape, label.shape
             # there should fullfill an episode, takes in facts, questions , labels
             # return answer results, and rewards. The episode including interaction
             # with env is all done in  f_train, which will intricically call reasoner.apply
-            agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
+            rl_cost, sl_cost, decoder_cost = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
+
+            print 'the costs are: ',rl_cost,sl_cost,decoder_cost
 
         # facts[0].T.shape, facts[1].T.shape, question[0].T.shape, question[1].T.shape, label.shape layout: (10, 5) (10, 5) (13, 1) (13, 1) (1,)
 

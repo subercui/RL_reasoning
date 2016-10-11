@@ -191,7 +191,7 @@ class GRU(object):
         if mask_below == None:
             mask_below = T.ones(state_below.shape[:2], dtype='float32')
             # mask_below = T.ones_like(state_below,'float32')
-            print mask_below
+            # print mask_below
         if self.with_contex:
             if init_state is None:
                 init_state = T.tanh(theano.dot(context, self.W_c_init))

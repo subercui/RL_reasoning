@@ -3,9 +3,10 @@ import theano.tensor as T
 import theano.tensor.extra_ops as Ops
 from theano.tensor.nnet import categorical_crossentropy
 import numpy as np
+from layers import nonlinearities
 from layers.layers import DenseLayer,GRU,lookup_table,auto_encoder,LogisticRegression
 from utils import *
-from component import Dense,Sigmoid,Softmax
+
 TINY = 1e-8
 
 class Memory(object):
@@ -33,7 +34,6 @@ class Memory(object):
         self.cost = facts_encoder.cost #a float
         self.cost_entry = facts_encoder.cost_entry # vector of float (5), the cost for the specific fact choosed
         self.length = self.output.shape[0]
-        print self.length
 
     def read(self, index):
 
@@ -109,30 +109,27 @@ class LocationNet(object):
         return self.lt
 
 
-class Reasoner_RNN(object):
+class Executor(object):
     def __init__(self, n_qfvector, n_state, n_answer_class):
         self.n_qfvector = n_qfvector
         self.n_state = n_state
         self.n_answer_class = n_answer_class
-        self.dense = Dense(self.n_qfvector, self.n_state)
-        self.stop_sig = Sigmoid(self.n_state)
-        self.answer_sm = Softmax(self.n_state, self.n_answer_class)
-        self.dense._init_params()
-        self.stop_sig._init_params()
-        self.answer_sm._init_params()
+        self.dense = DenseLayer(self.n_qfvector+self.n_state, self.n_state, nonlinearity=None)
+        self.stop_sig = DenseLayer(self.n_state, 1, nonlinearity=nonlinearities.sigmoid)
+        self.answer_sm = DenseLayer(self.n_state, self.n_answer_class, nonlinearity=nonlinearities.softmax)
+
         self.params = self.dense.params + self.stop_sig.params + self.answer_sm.params
 
     def step_forward(self, qfvector, state_tm1=None, init_flag=False):
-        init_state = T.alloc(numpy.float32(0.), self.n_state)
         if init_flag:
+            init_state = T.alloc(numpy.float32(0.), qfvector.shape[0], self.n_state)
             state_tm1 = init_state
-        state = self.dense.apply(qfvector, state_tm1)
-        self.state = state
-        stop = self.stop_sig.apply(self.state)
-        self.stop = stop
-        answer = self.answer_sm.apply(self.state)
-        self.answer = answer
-        return self.state, self.stop, self.answer
+        dense_in = T.concatenate([qfvector, state_tm1], axis=1)
+        state = self.dense.get_output_for(dense_in)
+        stop = self.stop_sig.get_output_for(state)
+        answer = self.answer_sm.get_output_for(state)
+
+        return state, stop, answer
     #
     # def dist_info_sym(self, obs_var, state_info_vars=None):
     #     return dict(prob=L.get_output(self._l_prob, {self._l_obs: obs_var}))
@@ -156,7 +153,6 @@ class Reasoner(object):
         self.T = kwargs.pop('T')
         self.stp_thrd = kwargs.pop('stp_thrd')
         self.params=[]
-        self.paramss = []
 
     def apply(self, facts, facts_mask, question, question_mask, y):
         """
@@ -166,7 +162,6 @@ class Reasoner(object):
 
         table = lookup_table(self.n_in, self.vocab_size)
         self.params += table.params
-        self.paramss +=  table.params
 
         memory = Memory(facts, facts_mask, self.vocab_size,
                                      self.n_in, self.n_grus, table=table)
@@ -176,7 +171,7 @@ class Reasoner(object):
         self.params += memory.params
         self.params += quest.params
 
-        self.exct_net = Reasoner_RNN(self.n_qf, self.n_hts, self.n_label)
+        self.exct_net = Executor(self.n_qf, self.n_hts, self.n_label)
         self.params += self.exct_net.params
 
         self.loc_net = LocationNet(n_hids=self.n_lhids,n_layers=1,n_in=self.n_qf+self.n_hts)
@@ -237,23 +232,15 @@ class Reasoner(object):
         self.decoder_cost = memory.cost + quest.cost
         self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))
 
-        # print(answers_dist.ndim)
-
 
 
         stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * rewards
         answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * rewards
         lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': lts_dist}) * rewards
-        # print(rewards.ndim)
-        # print(stop_cost.ndim)
-        # print(answer_cost.ndim)
 
         self.rl_cost = -T.mean(stop_cost+answer_cost+lt_cost)
         #TODO: we need to improve this rl_cost to introduce anti-variance measures
 
-        print self.rl_cost.ndim
-        print self.sl_cost.ndim
-        print self.decoder_cost.ndim
 
         return self.rl_cost, self.sl_cost, self.decoder_cost
 
@@ -271,9 +258,6 @@ class Reasoner(object):
 
         oneHot = Ops.to_one_hot(actions_var,probs.shape[1])
         res = T.log(T.sum(probs*T.cast(oneHot,'float32'),axis=-1)+TINY)
-        # print probs.ndim
-        # print oneHot.ndim
-        # print res.ndim
         return res
 
 
