@@ -209,6 +209,8 @@ class Reasoner(object):
             #TODO: implement a real sampling
             terminal = self._terminate(stop_dist[0,0])
             reward = self.env.step(answer, terminal, y)
+            # printed = theano.printing.Print('this is a very important value')(terminal)
+            # terminal = printed
 
             stops_dist.append(stop_dist)
             answers_dist.append(answer_dist)
@@ -218,8 +220,8 @@ class Reasoner(object):
             lts.append(l_idx)
             rewards.append(reward)
 
-            if T.gt(terminal,0):
-                break
+            # if T.gt(terminal,0):
+            #     break
 
         stops_dist = T.concatenate(stops_dist,axis=0)#ndim=2
         answers_dist = T.concatenate(answers_dist,axis=0)#ndim=2
@@ -228,6 +230,8 @@ class Reasoner(object):
         answers = T.stack(answers,axis=0)#ndim=1
         lts = T.stack(lts,axis=0)#ndim=1
         rewards = T.stack(rewards,axis=0)#ndim=1
+        printed = theano.printing.Print('this is a very important value')(lts)
+        lts = printed
 
         self.decoder_cost = memory.cost + quest.cost
         self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))
