@@ -2,6 +2,7 @@ import theano
 import theano.tensor as T
 import theano.tensor.extra_ops as Ops
 from theano.tensor.nnet import categorical_crossentropy
+from theano.ifelse import ifelse
 import numpy as np
 from layers import nonlinearities
 from layers.layers import DenseLayer,GRU,lookup_table,auto_encoder,LogisticRegression
@@ -36,11 +37,7 @@ class Memory(object):
         self.length = self.output.shape[0]
 
     def read(self, index):
-
-        if(T.lt(index,self.cost_entry.shape[0])):
-            return self.output[index:index+1,:],self.cost_entry[index]
-        else:
-            None,None
+        return self.output[index:index+1,:],self.cost_entry[index]
 
 
 
@@ -193,6 +190,7 @@ class Reasoner(object):
         answers = []
         lts = []
         rewards = []
+        end_t = self.T-1
 
         for t in xrange(self.T):
             sf, _ = memory.read(l_idx) #(1,n_grus=4)
@@ -202,15 +200,12 @@ class Reasoner(object):
             lt_dist = self.loc_net.apply(que, ht, memory)
             l_idx = T.argmax(lt_dist) #hard attention
             #htm1, stop, answer, l_idx = _step(memory, l_idx, que, htm1)
-
-
             answer = T.argmax(answer_dist)
 
             #TODO: implement a real sampling
             terminal = self._terminate(stop_dist[0,0])
-            reward = self.env.step(answer, terminal, y)
-            # printed = theano.printing.Print('this is a very important value')(terminal)
-            # terminal = printed
+            end_t = T.switch(terminal, T.minimum(t, end_t), end_t)
+            reward = self.env.step(answer, terminal, y, t, end_t)
 
             stops_dist.append(stop_dist)
             answers_dist.append(answer_dist)
@@ -220,8 +215,6 @@ class Reasoner(object):
             lts.append(l_idx)
             rewards.append(reward)
 
-            # if T.gt(terminal,0):
-            #     break
 
         stops_dist = T.concatenate(stops_dist,axis=0)#ndim=2
         answers_dist = T.concatenate(answers_dist,axis=0)#ndim=2
@@ -230,17 +223,26 @@ class Reasoner(object):
         answers = T.stack(answers,axis=0)#ndim=1
         lts = T.stack(lts,axis=0)#ndim=1
         rewards = T.stack(rewards,axis=0)#ndim=1
-        printed = theano.printing.Print('this is a very important value')(lts)
-        lts = printed
+        # rewards = theano.printing.Print('226 line reward:')(rewards)
+        # stops = theano.printing.Print('227 line reward:')(stops)
+
+        returns=[]
+        for idx in xrange(self.T):
+            returns.append(T.sum(rewards[idx:]))
+        returns = T.stack(returns, axis=0)  # ndim=1
 
         self.decoder_cost = memory.cost + quest.cost
+        # answer_dist = theano.printing.Print('230 line answer_dist:')(answer_dist)
+        y = theano.tensor.extra_ops.to_one_hot(y,answer_dist.shape[1])
+        # y = theano.printing.Print('231 line y:')(y)
+        # answers = theano.printing.Print('233 line answers:')(answers)
         self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))
 
 
 
-        stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * rewards
-        answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * rewards
-        lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': lts_dist}) * rewards
+        stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * returns
+        answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * returns
+        lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': lts_dist}) * returns
 
         self.rl_cost = -T.mean(stop_cost+answer_cost+lt_cost)
         #TODO: we need to improve this rl_cost to introduce anti-variance measures
@@ -286,12 +288,21 @@ class Env(object):
         self.final_award = final_award
         self.stp_penalty = stp_penalty
 
-    def step(self, answer, terminal, y):
+    def step(self, answer, terminal, y, t, end_t):
 
-        if T.gt(terminal,0):
-            reward = self.final_award*(answer == y)
-        else:
-            reward = self.stp_penalty
+        # answer = theano.printing.Print('284 line answer:')(answer)
+        # y = theano.printing.Print('285 line y:')(y)
+        terminal_sig = T.gt(terminal, 0)
+        # terminal_sig = theano.printing.Print('300 line terminal_sig:')(terminal_sig)
+
+        cond = T.eq(answer, y[0])
+        final_award = T.switch(cond, 1., 0.)
+
+        reward = T.switch(terminal_sig, final_award, self.stp_penalty)
+
+        reward = T.switch(T.eq(t, end_t), final_award, reward)#if end now, force terminal
+
+        reward = T.switch(T.gt(t, end_t), 0., reward)#if already end, force reward = 0.
 
         return reward
         
