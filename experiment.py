@@ -17,8 +17,11 @@ theano.config.optimizer = 'fast_compile'
 
 # config = getattr(config, 'get_config')()
 # data_class = preprocess(*config['train_file'])
+# data = {'facts': [], 'question': [], 'label': []}
 # for facts, question, label in data_class.data_stream():
-# 	print label
+#     data['facts'].append(facts)
+#     data['question'].append(question)
+#     data['label'].append(label)
 
 if __name__ == '__main__':
 
@@ -32,7 +35,7 @@ if __name__ == '__main__':
     data_class = preprocess(*config['train_file'])
     for _ in xrange(n_itr):
 
-        paths = []
+        cnt = 0
 
         for facts, question, label in data_class.data_stream():
             observations = []
@@ -44,6 +47,9 @@ if __name__ == '__main__':
             rl_cost, sl_cost, decoder_cost = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
 
             print 'the costs are: ',rl_cost,sl_cost,decoder_cost
+
+            cnt += 1
+            print 'cnt:',cnt
 
         # facts[0].T.shape, facts[1].T.shape, question[0].T.shape, question[1].T.shape, label.shape layout: (10, 5) (10, 5) (13, 1) (13, 1) (1,)
 

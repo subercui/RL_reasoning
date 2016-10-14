@@ -230,17 +230,19 @@ class Reasoner(object):
         for idx in xrange(self.T):
             returns.append(T.sum(rewards[idx:]))
         returns = T.stack(returns, axis=0)  # ndim=1
+        returns = theano.printing.Print('233 line returns:')(returns)
 
         self.decoder_cost = memory.cost + quest.cost
         # answer_dist = theano.printing.Print('230 line answer_dist:')(answer_dist)
         y = theano.tensor.extra_ops.to_one_hot(y,answer_dist.shape[1])
         # y = theano.printing.Print('231 line y:')(y)
         # answers = theano.printing.Print('233 line answers:')(answers)
+        # TODO: Now, final answer can't simply select the last one!
         self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))
 
 
 
-        stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist}) * returns
+        stop_cost=self.log_likelihood_sym(actions_var=stops, dist_info_vars={'prob': stops_dist},bernoulli=True) * returns
         answer_cost=self.log_likelihood_sym(actions_var=answers, dist_info_vars={'prob': answers_dist}) * returns
         lt_cost=self.log_likelihood_sym(actions_var=lts, dist_info_vars={'prob': lts_dist}) * returns
 
@@ -251,18 +253,24 @@ class Reasoner(object):
         return self.rl_cost, self.sl_cost, self.decoder_cost
 
 
-    def log_likelihood_sym(self, actions_var, dist_info_vars):
+    def log_likelihood_sym(self, actions_var, dist_info_vars, bernoulli = False):
         """
         PS: x_var should be the samples from the distributions represented with dist_info_vars
         """
         probs = dist_info_vars["prob"]
         # Assume layout is N * A
-        # i=0
-        # while(T.lt(i,actions_var.shape[0])):
-        #     ress = probs[i,actions_var[i]]
-        # res = T.log(ress + TINY)
 
+        if bernoulli:
+            actions_var = T.shape_padright(actions_var)
+            actions_var = theano.printing.Print('264 line actions_var:')(actions_var)
+            # probs = theano.printing.Print('265 line probs:')(probs)
+            res = T.sum(actions_var * T.log(probs + TINY) + (1 - actions_var) * T.log(1 - probs + TINY), axis=-1)
+            return res
+
+        # actions_var = theano.printing.Print('269 line actions_var:')(actions_var)
+        # probs = theano.printing.Print('270 line probs:')(probs)
         oneHot = Ops.to_one_hot(actions_var,probs.shape[1])
+        # oneHot = theano.printing.Print('272 line oneHot:')(oneHot)
         res = T.log(T.sum(probs*T.cast(oneHot,'float32'),axis=-1)+TINY)
         return res
 
