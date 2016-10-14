@@ -24,9 +24,11 @@ class Agent(object):
         y_mask = T.matrix('y_mask')
         l = T.lvector('l')
 
+        support_facts = T.lvector('support_facts')
+
         # returns_var = T.matrix() # if needed compute this variable outside of f_train
 
-        rl_cost, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l)
+        rl_cost, sl_cost, decoder_cost = self.executor.apply(x, x_mask, y, y_mask, l,support_facts)
         # cost = self.combine_costs(sl_cost, decoder_cost, rl_cost)
         cost = sl_cost + decoder_cost
 
@@ -34,7 +36,7 @@ class Agent(object):
         updates = adadelta(self.executor.params, grads)
 
         f_train = theano.function(
-            inputs=[x, x_mask, y, y_mask, l],
+            inputs=[x, x_mask, y, y_mask, l,support_facts],
             outputs=[sl_cost,decoder_cost],
             updates=updates,
             allow_input_downcast=True

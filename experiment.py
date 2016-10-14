@@ -31,19 +31,19 @@ if __name__ == '__main__':
     n_eps = config['n_eps']
 
     agent = Agent(**config)
-    data_class = preprocess(*config['train_file'])
+    data_class = preprocess(*config['train_file_sf'])
     for _ in xrange(n_itr):
 
         cnt = 0
 
-        for facts, question, label in data_class.data_stream():
+        for facts, question, label,support_facts in data_class.data_stream_sf():
             observations = []
             actions = []
             rewards = []
             # there should fullfill an episode, takes in facts, questions , labels
             # return answer results, and rewards. The episode including interaction
             # with env is all done in  f_train, which will intricically call reasoner.apply
-            sl_cost,decoder_cost = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
+            sl_cost,decoder_cost = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label, support_facts)
 
             print 'the costs are: ',sl_cost,decoder_cost
 

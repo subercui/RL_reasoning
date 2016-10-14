@@ -30,10 +30,13 @@ def process_line(line, add_head_tail=True):
     return line_vec
 
 class preprocess(object):
-    def __init__(self, fact_filename, question_filename, res_filename, dict_file=None):
+    def __init__(self, fact_filename, question_filename, res_filename, sf_filename, dict_file=None):
         self.fact_filename = fact_filename
         self.question_filename = question_filename
         self.res_filename = res_filename
+        self.sf_filename = sf_filename
+
+
         if dict_file is None:
             self.dict_file = config['dict_file']
 
@@ -97,6 +100,28 @@ class preprocess(object):
                 numpy.asarray(res_line, dtype='int64').flatten()
             yield data
 
+    def data_stream_sf(self):
+        fact_file = open(self.fact_filename)
+        question_file = open(self.question_filename)
+        res_file = open(self.res_filename)
+        sf_file = open(self.sf_filename)
+
+
+        for fact_line, question_line, res_line ,sf_line in \
+        zip(fact_file, question_file, res_file,sf_file):
+            fact_line = self._mapline(fact_line, self.vocab_dic)
+            question_line = self._mapline(question_line, self.vocab_dic)
+            res_line = self._mapline(res_line, self.res_dic, add_head_tail=False)
+            sf = [int(sf_line.split(" ")[i]) for i in range(2)]
+            data =  self.block_padding(fact_line), \
+                self.block_padding(question_line), \
+                numpy.asarray(res_line, dtype='int64').flatten(),\
+                numpy.asarray(sf, dtype='int64').flatten()
+            yield data
+
+
+
+
     @staticmethod
     def block_padding(sentences):
         batch_size = len(sentences)
@@ -109,13 +134,11 @@ class preprocess(object):
             padding[index, :lens] = 1.
         return block, padding
 
-
-
 if __name__ == '__main__':
-    train_file = config['train_file']
+    train_file = config['train_file_sf']
     data_class = preprocess(*train_file)
-    # for data in data_class.data_stream():
-        # print data[2]
-        # break
+    for data in data_class.data_stream_sf():
+        print data[2]
+        break
 
 

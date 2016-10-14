@@ -19,10 +19,18 @@ def get_config():
 
 
 	#######temp data
-	tmp_suffix = ['.fact', '.ques', '.answer']
 	head_suffix = datadir+"19"
+
+	tmp_suffix = ['.fact', '.ques', '.answer']
 	config['train_file'] = [head_suffix+".train"+suffix for suffix in tmp_suffix]
 	config['test_file'] = [head_suffix+".test"+suffix for suffix in tmp_suffix]
+
+
+
+	tmp_suffix0 = ['.fact', '.ques', '.answer','.support_facts']
+	config['train_file_sf'] = [head_suffix+".train"+suffix for suffix in tmp_suffix0]
+	config['test_file_sf'] = [head_suffix+".test"+suffix for suffix in tmp_suffix0]
+
 
 	####### dict file
 	config['dict_file'] = head_suffix +"pathfinding_19dict.pkl"

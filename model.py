@@ -39,9 +39,8 @@ class Memory(object):
     def read(self, index):
         return self.output[index:index+1,:],self.cost_entry[index]
 
-
-
 class Question(object):
+
     """
     author:liuxianggen
     """
@@ -62,7 +61,6 @@ class Question(object):
         self.params += facts_encoder.params
         self.output = facts_encoder.output  # (39)
         self.cost = facts_encoder.cost
-
 
 class LocationNet(object):
     """
@@ -322,7 +320,7 @@ class Reasoner_stepwise(object):
         self.stp_thrd = kwargs.pop('stp_thrd')
         self.params=[]
 
-    def apply(self, facts, facts_mask, question, question_mask, y):
+    def apply(self, facts, facts_mask, question, question_mask, y,support_facts):
         """
         layout: (10, 5) (10, 5) (13, 1) (13, 1) (1,)
         return: answer, cost
@@ -346,20 +344,13 @@ class Reasoner_stepwise(object):
         # mem = memory.output #Fact Memory (5,n_grus=4)
         que = quest.output #(1,n_grus=4)
 
-        l_idx = 0
         htm1 = None
 
-        stops_dist = []
         answers_dist = []
-        lts_dist = []
-        stops = []
         answers = []
-        lts = []
-        rewards = []
-        end_t = self.T-1
 
-        # for t in xrange(self.T):
         for t in xrange(2):
+            l_idx = support_facts[t]-1
 
             sf, _ = memory.read(l_idx) #(1,n_grus=4)
             qf = T.concatenate([que, sf], axis = 1) #layout: (1, 2*n_grus=8)
@@ -381,7 +372,7 @@ class Reasoner_stepwise(object):
         y = theano.tensor.extra_ops.to_one_hot(y,answer_dist.shape[1])
 
         # TODO: Now, final answer can't simply select the last one!
-        self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))
+        self.sl_cost = T.mean(categorical_crossentropy(answer_dist, y))  # can't understand !
 
 
         self.rl_cost = 0
