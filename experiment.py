@@ -15,13 +15,6 @@ logger = logging.getLogger(__name__)
 # theano.config.exception_verbosity = 'high'
 theano.config.optimizer = 'fast_compile'
 
-# config = getattr(config, 'get_config')()
-# data_class = preprocess(*config['train_file'])
-# data = {'facts': [], 'question': [], 'label': []}
-# for facts, question, label in data_class.data_stream():
-#     data['facts'].append(facts)
-#     data['question'].append(question)
-#     data['label'].append(label)
 
 if __name__ == '__main__':
 
@@ -30,6 +23,8 @@ if __name__ == '__main__':
     n_itr = config['n_itr']
     # collect n_eps episodes
     n_eps = config['n_eps']
+    # Time out
+    Time = config['T']
 
     agent = Agent(**config)
     data_class = preprocess(*config['train_file'])
@@ -38,22 +33,44 @@ if __name__ == '__main__':
         cnt = 0
 
         for facts, question, label in data_class.data_stream():
-            observations = []
+            observations = [facts, question]
             actions = []
             rewards = []
-            # there should fullfill an episode, takes in facts, questions , labels
-            # return answer results, and rewards. The episode including interaction
-            # with env is all done in  f_train, which will intricically call reasoner.apply
-            rl_cost, sl_cost, decoder_cost = agent.f_train(facts[0].T, facts[1].T, question[0].T, question[1].T, label)
 
-            print 'the costs are: ',rl_cost,sl_cost,decoder_cost
+            for t in xrange(Time):
+                action，terminal = agent.policy.get_action(Mem，Que)
+                reward = env.step(action)
+                # observations.append(observation)
+                actions.append(action)
+                rewards.append(reward)
+                # observation = next_observation
+                if terminal:
+                    # Finish rollout if terminal state reached
+                    break
 
-            cnt += 1
-            print 'cnt:',cnt
+                    # We need to compute the empirical return for each time step along the
+                    # trajectory
+            returns = []
+            return_so_far = 0
+            for t in range(len(rewards) - 1, -1, -1):
+                return_so_far = rewards[t] + discount * return_so_far
+                returns.append(return_so_far)
+            # The returns are stored backwards in time, so we need to revert it
+            returns = returns[::-1]
 
-        # facts[0].T.shape, facts[1].T.shape, question[0].T.shape, question[1].T.shape, label.shape layout: (10, 5) (10, 5) (13, 1) (13, 1) (1,)
+            paths.append(dict(
+                observations=np.array(observations),
+                actions=np.array(actions),
+                rewards=np.array(rewards),
+                returns=np.array(returns)
+            ))
 
-        # 实际上这是个不好的写法，我们应该尽量减少theano内部内容？比如与环境交互的部分移出去？
+        observations = np.concatenate([p["observations"] for p in paths])
+        actions = np.concatenate([p["actions"] for p in paths])
+        returns = np.concatenate([p["returns"] for p in paths])
+
+        f_train(observations, actions, returns)
+        print('Average Return:', np.mean([sum(p["rewards"]) for p in paths]))
 
         # this episode finishes, compute all cost, train backward
         # for facts, question, label in data_class.data_stream():
